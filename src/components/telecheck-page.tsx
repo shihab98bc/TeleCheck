@@ -216,7 +216,7 @@ export default function TeleCheckPage() {
     let processedCount = 0;
 
     for (const phoneNumber of numbersToProcess) {
-      await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay for faster bulk processing
+      await new Promise(resolve => setTimeout(resolve, 100)); 
 
       let singleResult: ResultState;
       const isValidPhoneNumber = /^\+?[1-9]\d{1,14}$/.test(phoneNumber);
@@ -251,11 +251,11 @@ export default function TeleCheckPage() {
       }
       currentResults.push(singleResult);
       processedCount++;
-      if (numbersToProcess.length > 1) { // Only show incremental progress for bulk
+      if (numbersToProcess.length > 1) { 
         const processingMessage: ResultState = { status: "processing", message: `Checked ${processedCount}/${numbersToProcess.length} numbers...` };
         setResults([processingMessage, ...currentResults.slice().reverse()]);
       } else {
-        setResults([...currentResults.slice().reverse()]); // For single number, just show its result
+        setResults([...currentResults.slice().reverse()]); 
       }
     }
     
@@ -319,13 +319,13 @@ export default function TeleCheckPage() {
   };
   
   const renderHeader = () => {
-    let icon = <ListChecks className="h-16 w-16 text-primary animate-pulse" />;
+    let icon = <ListChecks className="h-12 w-12 sm:h-16 sm:w-16 text-primary animate-pulse" />;
     let title = "TeleCheck Bot";
     let subtitle = "Bulk check Telegram account status quickly and easily.";
     let adminNote;
 
     if (currentUserStatus === "approved") {
-        icon = <UserCheck className="h-16 w-16 text-green-500" />;
+        icon = <UserCheck className="h-12 w-12 sm:h-16 sm:w-16 text-green-500" />;
         if (currentUserEmail === ADMIN_EMAIL) {
           title = "TeleCheck Bot - Admin";
           subtitle = "Manage user access and perform bulk checks.";
@@ -334,27 +334,27 @@ export default function TeleCheckPage() {
           adminNote = <p className="mt-3 text-sm text-green-500">Access Approved. You can use the checker.</p>;
         }
     } else if (currentUserStatus === "pending_approval") {
-        icon = <ListChecks className="h-16 w-16 text-amber-500" />;
+        icon = <ListChecks className="h-12 w-12 sm:h-16 sm:w-16 text-amber-500" />;
         title = "Request Pending";
         subtitle = "Your access to TeleCheck Bot is awaiting admin approval."
     } else if (currentUserStatus === "revoked") {
-        icon = <ShieldAlert className="h-16 w-16 text-destructive" />;
+        icon = <ShieldAlert className="h-12 w-12 sm:h-16 sm:w-16 text-destructive" />;
         title = "Access Revoked";
         subtitle = "Your access to TeleCheck Bot has been revoked. Please contact the admin.";
     } else if (currentUserStatus === "needs_approval") {
-        icon = <ShieldAlert className="h-16 w-16 text-destructive" />;
+        icon = <ShieldAlert className="h-12 w-12 sm:h-16 sm:w-16 text-destructive" />;
         title = "Access Required";
         subtitle = "Please request access to use the TeleCheck Bot."
     }
 
 
     return (
-      <header className="my-10 text-center">
+      <header className="my-8 sm:my-10 text-center">
         <div className="flex items-center justify-center mb-4">
           {icon}
         </div>
-        <h1 className="text-5xl font-bold font-headline text-primary">{title}</h1>
-        <p className="mt-2 text-xl text-muted-foreground">{subtitle}</p>
+        <h1 className="text-4xl sm:text-5xl font-bold font-headline text-primary">{title}</h1>
+        <p className="mt-2 text-lg sm:text-xl text-muted-foreground">{subtitle}</p>
         {adminNote}
       </header>
     );
@@ -382,80 +382,82 @@ export default function TeleCheckPage() {
           {sortedRequests.length === 0 || (sortedRequests.length === 1 && sortedRequests[0].email === ADMIN_EMAIL && sortedRequests[0].status === 'approved') ? (
             <p className="text-muted-foreground text-center py-4">No other user access requests yet.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Requested At</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedRequests.map((req) => (
-                  <TableRow key={req.email}>
-                    <TableCell className="font-medium">{req.email}{req.email === ADMIN_EMAIL && " (Admin)"}</TableCell>
-                    <TableCell>{new Date(req.requestedAt).toLocaleString()}</TableCell>
-                    <TableCell>
-                      <Badge variant={
-                        req.status === "approved" ? "default" :
-                        req.status === "pending_approval" ? "secondary" :
-                        req.status === "revoked" ? "destructive" : "outline"
-                      }>
-                        {req.status.replace("_", " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      {req.email !== ADMIN_EMAIL && req.status !== "approved" && (
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleAdminAction(req.email, "approved")}
-                        >
-                          Approve
-                        </Button>
-                      )}
-                      {req.email !== ADMIN_EMAIL && req.status === "approved" && (
-                        <Button 
-                          size="sm" 
-                          variant="destructive"
-                          onClick={() => handleAdminAction(req.email, "revoked")}
-                        >
-                          Revoke
-                        </Button>
-                      )}
-                       {req.email !== ADMIN_EMAIL && req.status === "pending_approval" && (
-                        <Button 
-                          size="sm" 
-                          variant="destructive"
-                          onClick={() => handleAdminAction(req.email, "revoked")} 
-                        >
-                          Reject
-                        </Button>
-                      )}
-                       {req.email !== ADMIN_EMAIL && req.status === "revoked" && (
-                         <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleAdminAction(req.email, "pending_approval")}
-                        >
-                          Re-evaluate
-                        </Button>
-                       )}
-                       {req.email === ADMIN_EMAIL && req.status !== "approved" && (
-                         <Button 
-                          size="sm" 
-                          variant="default" 
-                          onClick={() => handleAdminAction(req.email, "approved")}
-                        >
-                          Re-Approve Admin
-                        </Button>
-                       )}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[200px] sm:min-w-[250px]">Email</TableHead>
+                    <TableHead className="min-w-[180px] sm:min-w-[200px]">Requested At</TableHead>
+                    <TableHead className="min-w-[120px]">Status</TableHead>
+                    <TableHead className="text-right min-w-[200px]">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {sortedRequests.map((req) => (
+                    <TableRow key={req.email}>
+                      <TableCell className="font-medium break-all">{req.email}{req.email === ADMIN_EMAIL && " (Admin)"}</TableCell>
+                      <TableCell>{new Date(req.requestedAt).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          req.status === "approved" ? "default" :
+                          req.status === "pending_approval" ? "secondary" :
+                          req.status === "revoked" ? "destructive" : "outline"
+                        }>
+                          {req.status.replace("_", " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right space-x-1 sm:space-x-2">
+                        {req.email !== ADMIN_EMAIL && req.status !== "approved" && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleAdminAction(req.email, "approved")}
+                          >
+                            Approve
+                          </Button>
+                        )}
+                        {req.email !== ADMIN_EMAIL && req.status === "approved" && (
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => handleAdminAction(req.email, "revoked")}
+                          >
+                            Revoke
+                          </Button>
+                        )}
+                         {req.email !== ADMIN_EMAIL && req.status === "pending_approval" && (
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => handleAdminAction(req.email, "revoked")} 
+                          >
+                            Reject
+                          </Button>
+                        )}
+                         {req.email !== ADMIN_EMAIL && req.status === "revoked" && (
+                           <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleAdminAction(req.email, "pending_approval")}
+                          >
+                            Re-evaluate
+                          </Button>
+                         )}
+                         {req.email === ADMIN_EMAIL && req.status !== "approved" && (
+                           <Button 
+                            size="sm" 
+                            variant="default" 
+                            onClick={() => handleAdminAction(req.email, "approved")}
+                          >
+                            Re-Approve Admin
+                          </Button>
+                         )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -572,7 +574,7 @@ export default function TeleCheckPage() {
             &copy; {new Date().getFullYear()} TeleCheck Bot. All rights reserved.
         </p>
         {process.env.NODE_ENV === 'development' && (
-          <div className="mt-4 space-x-2">
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button variant="link" size="sm" className="text-xs" onClick={() => {
               localStorage.removeItem("telecheck_accessRequests");
               localStorage.removeItem("telecheck_currentUserEmail");
@@ -623,4 +625,3 @@ export default function TeleCheckPage() {
     
 
     
-
