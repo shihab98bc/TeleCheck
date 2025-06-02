@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, Send } from "lucide-react";
+import { Mail, Send, ShieldQuestion } from "lucide-react";
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address."),
@@ -37,11 +37,12 @@ export function RequestAccessForm({ onSubmit, isLoading }: RequestAccessFormProp
     <Card className="w-full max-w-md shadow-xl">
       <CardHeader>
         <CardTitle className="flex items-center text-2xl font-headline">
-          <Mail className="mr-2 h-8 w-8 text-primary" />
+          <ShieldQuestion className="mr-2 h-8 w-8 text-primary" />
           Request Access
         </CardTitle>
         <CardDescription>
-          Please enter your email to request access to TeleCheck Bot. Your request will be sent to the admin for approval.
+          To use TeleCheck Bot, please enter your email to request access. 
+          Your request will be reviewed by the site administrator.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -82,3 +83,5 @@ export function RequestAccessForm({ onSubmit, isLoading }: RequestAccessFormProp
     </Card>
   );
 }
+
+  

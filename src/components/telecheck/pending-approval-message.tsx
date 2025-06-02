@@ -3,7 +3,7 @@
 
 import type * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Hourglass, MailCheck } from "lucide-react";
+import { Hourglass, MailCheck, UserCheck } from "lucide-react";
 
 type PendingApprovalMessageProps = {
   userEmail?: string;
@@ -16,7 +16,7 @@ export function PendingApprovalMessage({ userEmail, adminEmail }: PendingApprova
       <CardHeader className="items-center text-center">
         <MailCheck className="h-12 w-12 text-primary mb-3" />
         <CardTitle className="text-2xl font-headline">
-          Request Submitted
+          Request Submitted & Pending Review
         </CardTitle>
         {userEmail && (
           <CardDescription className="text-base">
@@ -27,16 +27,18 @@ export function PendingApprovalMessage({ userEmail, adminEmail }: PendingApprova
       <CardContent className="text-center">
         <div className="flex items-center justify-center mb-4">
           <Hourglass className="mr-2 h-6 w-6 text-amber-500 animate-spin" />
-          <p className="text-lg text-amber-500">Pending Admin Approval</p>
+          <p className="text-lg text-amber-500">Awaiting Admin Approval</p>
         </div>
         <p className="text-muted-foreground">
-          The site administrator (<span className="font-medium">{adminEmail}</span>) has been notified.
+          The site administrator (<span className="font-medium text-foreground">{adminEmail}</span>) will review your request.
           You will be able to use the TeleCheck Bot once your request is approved.
         </p>
         <p className="mt-4 text-sm text-muted-foreground">
-            Please check back later.
+            Please check back later or contact the administrator if you have any questions.
         </p>
       </CardContent>
     </Card>
   );
 }
+
+  
