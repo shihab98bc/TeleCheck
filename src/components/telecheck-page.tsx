@@ -51,9 +51,9 @@ export default function TeleCheckPage() {
   const { toast } = useToast();
 
   const [downloadFilters, setDownloadFilters] = useState<DownloadFilters>({
-    found: true,
-    not_found: true,
-    error: true,
+    found: false,
+    not_found: false,
+    error: false,
   });
 
   const saveAccessRequests = useCallback((updatedRequests: AccessRequest[]) => {
@@ -294,7 +294,7 @@ export default function TeleCheckPage() {
     if (filteredForDownload.length === 0) {
       toast({
         title: "No Results to Download",
-        description: "No results match your selected filters, or there are no relevant results to download.",
+        description: "No results match your selected filters, or there are no relevant results to download. Please select at least one filter.",
         variant: "destructive",
       });
       return;
@@ -622,6 +622,8 @@ export default function TeleCheckPage() {
     </div>
   );
 }
+    
+
     
 
     
