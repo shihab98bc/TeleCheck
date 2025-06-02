@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label";
 import { ThemeToggleButton } from "@/components/theme-toggle-button";
 
 
-const MAX_NUMBERS_BULK_CHECK = 500;
+const MAX_NUMBERS_BULK_CHECK = 10000;
 const ADMIN_EMAIL = "shihab98bc@gmail.com";
 
 type UserStatus = "loading" | "needs_approval" | "pending_approval" | "approved" | "revoked";
@@ -100,11 +100,8 @@ export default function TeleCheckPage() {
         } else {
             requests.push({ email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved" });
         }
-        // If admin record was modified or added, ensure accessRequests state reflects this before setting dependent states.
-        // The saveAccessRequests call will handle updating localStorage.
-        // No, direct setAccessRequests is better here for initial load.
     }
-    setAccessRequests(requests); // Set initial requests state
+    setAccessRequests(requests); 
 
     if (storedEmail) {
       const userRequest = requests.find(req => req.email === storedEmail);
@@ -124,7 +121,7 @@ export default function TeleCheckPage() {
 
 
   const handleRequestAccessSubmit = (data: { email: string }) => {
-    if (!isClient) return; // Should not happen as form is rendered when isClient is true
+    if (!isClient) return; 
     setIsLoading(true);
     
     const now = new Date().toISOString();
@@ -188,7 +185,7 @@ export default function TeleCheckPage() {
   };
 
   const handleAdminAction = (targetEmail: string, newStatus: UserStatus) => {
-    if (!isClient) return; // Should not happen
+    if (!isClient) return; 
     let updatedRequests = accessRequests.map(req =>
       req.email === targetEmail ? { ...req, status: newStatus, requestedAt: new Date().toISOString() } : req
     );
@@ -304,6 +301,7 @@ export default function TeleCheckPage() {
   };
 
   const handleDownloadResults = () => {
+    if (!isClient) return;
     const downloadable = results.filter(
       r => r.phoneNumber && (r.status === 'found' || r.status === 'not_found' || r.status === 'error')
     );
@@ -386,7 +384,7 @@ export default function TeleCheckPage() {
   };
 
   const renderAdminPanel = () => {
-    if (!isAdmin) { // isAdmin already checks for isClient
+    if (!isAdmin) { 
       return null;
     }
 
@@ -490,7 +488,7 @@ export default function TeleCheckPage() {
   };
 
   const renderDownloadSection = () => {
-    if (!isClient) return null; // Ensure this doesn't render prematurely
+    if (!isClient) return null; 
 
     const downloadableResultsExist = results.some(r => r.phoneNumber && (r.status === 'found' || r.status === 'not_found' || r.status === 'error'));
     if (!downloadableResultsExist || currentUserStatus !== "approved") {
@@ -589,16 +587,16 @@ export default function TeleCheckPage() {
   return (
     <div className="flex flex-col items-center justify-start min-h-screen p-4 sm:p-6 lg:p-8 bg-background text-foreground">
       <header className="w-full flex justify-between items-start pt-6 sm:pt-8 pb-8 sm:pb-10 px-4 sm:px-0">
-        <div className="flex-1"></div> {/* Spacer to help center title if needed or for future left items */}
+        <div className="flex-1"></div> 
         <div className="flex-1 flex justify-center">
           {renderHeaderContent()}
         </div>
         <div className="flex-1 flex justify-end">
-          {isClient && <ThemeToggleButton />} {/* Render ThemeToggleButton only on client */}
+          {isClient && <ThemeToggleButton />} 
         </div>
       </header>
       <main className="w-full flex flex-col items-center">
-        {isAdmin && renderAdminPanel()} {/* isAdmin already checks for isClient */}
+        {isAdmin && renderAdminPanel()} 
         {renderContent()}
       </main>
       <footer className="mt-12 mb-6 text-center text-muted-foreground">
@@ -608,10 +606,10 @@ export default function TeleCheckPage() {
         <p className="text-xs mt-1">
             &copy; {new Date().getFullYear()} TeleCheck Bot. All rights reserved.
         </p>
-        {isClient && process.env.NODE_ENV === 'development' && ( // Guard dev buttons with isClient
+        {isClient && process.env.NODE_ENV === 'development' && ( 
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button variant="link" size="sm" className="text-xs" onClick={() => {
-              if (typeof window !== "undefined") { // Still good practice for direct localStorage manipulation
+              if (isClient) { 
                 localStorage.removeItem("telecheck_accessRequests");
                 localStorage.removeItem("telecheck_currentUserEmail");
               }
@@ -660,3 +658,4 @@ export default function TeleCheckPage() {
   );
 }
     
+
