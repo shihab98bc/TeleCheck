@@ -288,6 +288,11 @@ export default function TeleCheckPage() {
   const handleAdminAction = (targetEmail: string, newStatus: "approved" | "revoked" | "pending_approval") => {
     if (!isClient || !isAdmin) return; 
 
+    let toastTitle = "";
+    let toastMessage = "";
+    const originalRequest = accessRequests.find(r => r.email === targetEmail);
+    const originalStatus = originalRequest?.status;
+
     let updatedRequests = accessRequests.map(req =>
       req.email === targetEmail ? { ...req, status: newStatus, requestedAt: new Date().toISOString() } : req
     );
@@ -308,12 +313,30 @@ export default function TeleCheckPage() {
             }
         }
     }
-    if (newStatus === "approved" && targetEmail === currentUserEmail) {
+    if (newStatus === "approved") {
         const userIndex = updatedRequests.findIndex(req => req.email === targetEmail);
         if (userIndex > -1) {
             updatedRequests[userIndex].lastSeen = new Date().toISOString();
         }
+        toastTitle = "User Access Approved";
+        toastMessage = `Access for ${targetEmail} has been approved.`;
+        if (targetEmail === ADMIN_EMAIL) {
+          toastTitle = "Admin Access Re-affirmed";
+          toastMessage = `Admin access for ${targetEmail} has been re-affirmed.`;
+        }
+    } else if (newStatus === "revoked") {
+        if (originalStatus === 'pending_approval') {
+            toastTitle = "Request Rejected";
+            toastMessage = `Access request from ${targetEmail} has been rejected.`;
+        } else { // Was 'approved' or already 'revoked' (though UI should prevent revoking already revoked)
+            toastTitle = "Access Revoked";
+            toastMessage = `Access for ${targetEmail} has been revoked.`;
+        }
+    } else if (newStatus === "pending_approval") { // This is for "Re-evaluate"
+        toastTitle = "User Re-evaluation";
+        toastMessage = `${targetEmail} is now pending re-evaluation by the admin.`;
     }
+
 
     saveAccessRequests(updatedRequests);
 
@@ -321,17 +344,8 @@ export default function TeleCheckPage() {
       setCurrentUserStatus(newStatus);
     }
     
-    let toastMessage = `Access for ${targetEmail} has been set to ${newStatus.replace("_", " ")}.`;
-    if (newStatus === "pending_approval" && targetEmail !== ADMIN_EMAIL) {
-        toastMessage = `${targetEmail} is now pending re-evaluation.`;
-    } else if (newStatus === "revoked" && targetEmail !== ADMIN_EMAIL) {
-        toastMessage = `Access for ${targetEmail} has been revoked.`;
-    } else if (targetEmail === ADMIN_EMAIL && newStatus === "approved") {
-        toastMessage = `Admin access for ${targetEmail} has been re-affirmed.`;
-    }
-
     toast({
-      title: `User Access ${newStatus === "approved" ? "Approved" : newStatus === "revoked" ? "Updated" : "Set to Pending"}`,
+      title: toastTitle,
       description: toastMessage,
     });
   };
@@ -735,7 +749,7 @@ export default function TeleCheckPage() {
       <header className="w-full flex justify-between items-start pt-6 sm:pt-8 pb-8 sm:pb-10 px-4 sm:px-0">
         <div className="flex-1"></div> 
         <div className="flex-1 flex justify-center">
-          {renderHeaderContent()}
+          {isClient && renderHeaderContent()}
         </div>
         <div className="flex-1 flex justify-end">
           {isClient && <ThemeToggleButton />} 
@@ -743,7 +757,7 @@ export default function TeleCheckPage() {
       </header>
       <main className="w-full flex flex-col items-center">
         {isAdmin && renderAdminPanel()}
-        {renderContent()}
+        {isClient && renderContent()}
         {isClient && <ContactAdminCard /> }
       </main>
       <footer className="mt-12 mb-6 text-center text-muted-foreground">
@@ -804,3 +818,4 @@ export default function TeleCheckPage() {
     </div>
   );
 }
+
