@@ -141,10 +141,9 @@ export default function TeleCheckPage() {
   const isAdmin = isClient && currentUserEmail === ADMIN_EMAIL && currentUserStatus === "approved";
 
   const saveAccessRequests = useCallback((updatedRequests: AccessRequest[]) => {
+    if (!isClient) return;
     setAccessRequests(updatedRequests);
-    if (isClient) { 
-      localStorage.setItem("telecheck_accessRequests", JSON.stringify(updatedRequests));
-    }
+    localStorage.setItem("telecheck_accessRequests", JSON.stringify(updatedRequests));
   }, [isClient]);
 
   useEffect(() => {
@@ -166,30 +165,26 @@ export default function TeleCheckPage() {
       }
     }
     
-    if (ADMIN_EMAIL) { 
-        let adminRecord = requests.find(req => req.email === ADMIN_EMAIL);
-        if (adminRecord) {
-            if (adminRecord.status !== "approved") {
-                adminRecord.status = "approved"; 
-                adminRecord.requestedAt = new Date().toISOString();
-            }
-        } else {
-            requests.push({ email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved" });
+    // Ensure admin is always present and approved in the requests list
+    let adminRecord = requests.find(req => req.email === ADMIN_EMAIL);
+    if (adminRecord) {
+        if (adminRecord.status !== "approved") {
+            adminRecord.status = "approved"; 
+            adminRecord.requestedAt = new Date().toISOString(); // Update timestamp if status changed
         }
+    } else {
+        requests.push({ email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved" });
     }
     
-    setAccessRequests(requests);
+    setAccessRequests(requests); // Save updated requests including admin
 
     if (storedEmail) {
       const userRequest = requests.find(req => req.email === storedEmail);
       if (userRequest) {
         setCurrentUserStatus(userRequest.status);
       } else {
-        if (storedEmail === ADMIN_EMAIL) {
-            setCurrentUserStatus("approved");
-        } else {
-            setCurrentUserStatus("needs_approval");
-        }
+        // This case should be rare if admin is always added, but handles if userEmail is somehow stored without a request record
+         setCurrentUserStatus("needs_approval");
       }
     } else {
       setCurrentUserStatus("needs_approval");
@@ -253,9 +248,7 @@ export default function TeleCheckPage() {
     }
 
     saveAccessRequests(updatedRequests);
-    if (isClient) {
-      localStorage.setItem("telecheck_currentUserEmail", data.email);
-    }
+    localStorage.setItem("telecheck_currentUserEmail", data.email);
     setCurrentUserEmail(data.email);
     setCurrentUserStatus(newStatusForCurrentUser); 
     setIsLoading(false);
@@ -268,32 +261,39 @@ export default function TeleCheckPage() {
       req.email === targetEmail ? { ...req, status: newStatus, requestedAt: new Date().toISOString() } : req
     );
     
+    // Prevent revoking the sole admin's access if they are currently the admin
     if (targetEmail === ADMIN_EMAIL && newStatus === "revoked") {
-        const otherApprovedAdmins = updatedRequests.filter(r => r.email === ADMIN_EMAIL && r.status === "approved").length;
-        if (otherApprovedAdmins <= 1 && updatedRequests.find(r => r.email === ADMIN_EMAIL)?.status === 'approved') {
-             toast({
-                title: "Action Prevented",
-                description: "Cannot revoke the sole admin's access.",
-                variant: "destructive",
-            });
-            return;
+        const adminIsSelfRevoking = currentUserEmail === ADMIN_EMAIL;
+        const otherApprovedAdmins = updatedRequests.filter(r => r.email === ADMIN_EMAIL && r.status === "approved" && r.email !== targetEmail).length;
+        
+        if (adminIsSelfRevoking && otherApprovedAdmins === 0) {
+            // Check if the record being revoked IS the admin's own 'approved' record
+            const currentAdminRecord = accessRequests.find(r => r.email === ADMIN_EMAIL);
+            if (currentAdminRecord && currentAdminRecord.status === 'approved') {
+                 toast({
+                    title: "Action Prevented",
+                    description: "Cannot revoke the sole admin's access.",
+                    variant: "destructive",
+                });
+                return;
+            }
         }
     }
     
     saveAccessRequests(updatedRequests);
 
-    if (targetEmail === currentUserEmail && currentUserEmail !== ADMIN_EMAIL) {
+    // Update current user's status if their own access was changed by an admin (or by self if admin)
+    if (targetEmail === currentUserEmail) {
       setCurrentUserStatus(newStatus);
     }
-    if (targetEmail === currentUserEmail && targetEmail === ADMIN_EMAIL) {
-        setCurrentUserStatus(newStatus); 
-    }
-
+    
     let toastMessage = `Access for ${targetEmail} has been set to ${newStatus.replace("_", " ")}.`;
     if (newStatus === "pending_approval" && targetEmail !== ADMIN_EMAIL) {
         toastMessage = `${targetEmail} is now pending re-evaluation.`;
     } else if (newStatus === "revoked" && targetEmail !== ADMIN_EMAIL) {
         toastMessage = `Access for ${targetEmail} has been revoked.`;
+    } else if (targetEmail === ADMIN_EMAIL && newStatus === "approved") {
+        toastMessage = `Admin access for ${targetEmail} has been re-affirmed.`;
     }
 
 
@@ -318,7 +318,7 @@ export default function TeleCheckPage() {
       setIsLoading(false);
       return;
     }
-    
+        
     setResults([{ status: "processing", message: `Checking ${numbersToProcess.length} phone number(s)...` }]);
 
     const currentResults: ResultState[] = [];
@@ -638,7 +638,9 @@ export default function TeleCheckPage() {
       return <PendingApprovalMessage userEmail={currentUserEmail || undefined} adminEmail={ADMIN_EMAIL} />;
     }
     
-    if (currentUserStatus === "pending_approval" && currentUserEmail === ADMIN_EMAIL) {
+    if (currentUserStatus === "pending_approval" && currentUserEmail === ADMIN_EMAIL && !isAdmin) {
+        // This edge case means Admin requested, but their record from previous session was not 'approved'
+        // Or they somehow got into pending_approval state. Let them re-request to fix to 'approved'.
         return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
     }
 
@@ -716,14 +718,17 @@ export default function TeleCheckPage() {
                 if (currentUserEmail !== ADMIN_EMAIL || currentUserStatus !== "approved") {
                     setCurrentUserEmail(ADMIN_EMAIL);
                     setCurrentUserStatus("approved");
-                    let adminRecord = accessRequests.find(req => req.email === ADMIN_EMAIL);
+                    let updatedRequests = [...accessRequests];
+                    let adminRecord = updatedRequests.find(req => req.email === ADMIN_EMAIL);
                     if (adminRecord) {
                         if (adminRecord.status !== "approved") {
-                            saveAccessRequests(accessRequests.map(r => r.email === ADMIN_EMAIL ? {...r, status: "approved", requestedAt: new Date().toISOString()} : r));
+                           adminRecord.status = "approved";
+                           adminRecord.requestedAt = new Date().toISOString();
                         }
                     } else {
-                        saveAccessRequests([...accessRequests, {email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved"}]);
+                        updatedRequests.push({email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved"});
                     }
+                    saveAccessRequests(updatedRequests);
                 }
                  toast({title: "Dev: Ensure Admin Approved", description: `${ADMIN_EMAIL} set to approved.`, variant: "default"})
             }}>
@@ -747,6 +752,8 @@ export default function TeleCheckPage() {
     </div>
   );
 }
+    
+
     
 
     
