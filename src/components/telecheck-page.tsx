@@ -545,8 +545,8 @@ export default function TeleCheckPage() {
             </Card>
            )}
           <PhoneInputForm onSubmit={handlePhoneNumberSubmit} isLoading={isLoading} />
-          <ResultDisplay results={results} />
           {renderDownloadSection()}
+          <ResultDisplay results={results} />
         </>
       );
     }
@@ -623,3 +623,4 @@ export default function TeleCheckPage() {
     
 
     
+
