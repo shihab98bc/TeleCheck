@@ -9,7 +9,7 @@ import { ResultDisplay, type ResultState } from "@/components/telecheck/result-d
 import { RequestAccessForm } from "@/components/telecheck/request-access-form";
 import { PendingApprovalMessage } from "@/components/telecheck/pending-approval-message";
 import { useToast } from "@/hooks/use-toast";
-import { ListChecks, ShieldAlert, UserCheck, Users, ShieldCheck, UserCog, Download, FileSpreadsheet, MessageSquare, Phone, Send, ClipboardCopy, Hourglass } from "lucide-react";
+import { ListChecks, ShieldAlert, UserCheck, Users, ShieldCheck, UserCog, Download, FileSpreadsheet, MessageSquare, Phone, Send, ClipboardCopy, Hourglass, MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -185,6 +185,8 @@ export default function TeleCheckPage() {
             adminRecord.status = "approved";
             adminRecord.requestedAt = new Date().toISOString();
         }
+        if(!adminRecord.lastSeen) adminRecord.lastSeen = new Date().toISOString();
+
     } else {
         loadedRequests.push({ email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved", lastSeen: new Date().toISOString() });
     }
@@ -223,8 +225,6 @@ export default function TeleCheckPage() {
     setIsLoading(true);
     const now = new Date().toISOString();
 
-    // Fetch fresh from localStorage to ensure `updatedRequests` is based on the latest persisted data
-    // This is crucial for consistency if localStorage could be modified by other tabs/windows.
     let currentStoredRequestsData: AccessRequest[] = [];
     const storedRequestsStr = localStorage.getItem("telecheck_accessRequests");
     if (storedRequestsStr) {
@@ -232,23 +232,18 @@ export default function TeleCheckPage() {
             currentStoredRequestsData = JSON.parse(storedRequestsStr);
         } catch (e) {
             console.error("Failed to parse access requests from localStorage in handleRequestAccessSubmit", e);
-            // Fallback to current state if parsing fails, though this might indicate deeper issues
             currentStoredRequestsData = [...accessRequests];
         }
     } else {
-      // If nothing in localStorage, start with a fresh list (or current state as a base)
-      // This scenario might occur if localStorage was cleared or on first ever use.
-      // We still rely on the main useEffect to prime it with admin if it's truly empty.
       currentStoredRequestsData = [...accessRequests];
     }
     
-    // Ensure admin exists in this list, especially if loaded fresh and was empty.
     let adminInCurrentData = currentStoredRequestsData.find(req => req.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
     if (!adminInCurrentData) {
         currentStoredRequestsData.push({ email: ADMIN_EMAIL, requestedAt: now, status: "approved", lastSeen: now });
     } else if (adminInCurrentData.status !== "approved") {
-        adminInCurrentData.status = "approved"; // Ensure admin is always approved
-        adminInCurrentData.requestedAt = now; // Update requestedAt if status changed
+        adminInCurrentData.status = "approved"; 
+        adminInCurrentData.requestedAt = now; 
         if(!adminInCurrentData.lastSeen) adminInCurrentData.lastSeen = now;
     }
 
@@ -263,7 +258,6 @@ export default function TeleCheckPage() {
       if (existingRequestIndex > -1) {
         updatedRequests[existingRequestIndex] = { ...updatedRequests[existingRequestIndex], status: "approved", requestedAt: now, lastSeen: now };
       } else {
-        // This case should ideally not happen if admin is pre-added, but as a safeguard:
         updatedRequests.push({ email: data.email, requestedAt: now, status: "approved", lastSeen: now });
       }
       toast({
@@ -274,7 +268,7 @@ export default function TeleCheckPage() {
     } else {
       if (existingRequestIndex > -1) {
         const existingRequest = updatedRequests[existingRequestIndex];
-        if (existingRequest.status === 'revoked' || existingRequest.status === 'pending_approval') {
+        if (existingRequest.status === 'revoked' || existingRequest.status === 'pending_approval' || existingRequest.status === 'needs_approval') {
           updatedRequests[existingRequestIndex] = { ...existingRequest, status: "pending_approval", requestedAt: now, lastSeen: existingRequest.lastSeen };
           newStatusForCurrentUser = "pending_approval";
           toast({
@@ -283,7 +277,7 @@ export default function TeleCheckPage() {
           });
         } else if (existingRequest.status === 'approved') {
           newStatusForCurrentUser = "approved";
-          updatedRequests[existingRequestIndex] = { ...existingRequest, lastSeen: now }; // Update lastSeen on re-request if already approved
+          updatedRequests[existingRequestIndex] = { ...existingRequest, lastSeen: now }; 
           toast({
             title: "Already Approved",
             description: `Access for ${data.email} is already approved. Activity updated.`,
@@ -327,11 +321,9 @@ export default function TeleCheckPage() {
 
     if (targetEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase() && newStatus === "revoked") {
         const adminIsSelfRevoking = currentUserEmail?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-        // Check if there are other approved admin accounts if multiple admins were ever possible.
-        // For a single admin setup, this simply prevents self-revocation if they are the only admin.
         const otherApprovedAdmins = updatedRequests.filter(r => r.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && r.status === "approved" && r.email.toLowerCase() !== targetEmail.toLowerCase()).length;
-
         const currentAdminRecord = accessRequests.find(r => r.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+
         if (adminIsSelfRevoking && otherApprovedAdmins === 0 && currentAdminRecord && currentAdminRecord.status === 'approved') {
             toast({
                 title: "Action Prevented",
@@ -342,11 +334,10 @@ export default function TeleCheckPage() {
         }
     }
 
-
     if (newStatus === "approved") {
         const userIndex = updatedRequests.findIndex(req => req.email.toLowerCase() === targetEmail.toLowerCase());
         if (userIndex > -1) {
-            updatedRequests[userIndex].lastSeen = new Date().toISOString(); // Update lastSeen on approval
+            updatedRequests[userIndex].lastSeen = new Date().toISOString(); 
         }
         toastTitle = "User Access Approved";
         toastMessage = `Access for ${targetEmail} has been approved.`;
@@ -366,7 +357,6 @@ export default function TeleCheckPage() {
         toastTitle = "User Re-evaluation";
         toastMessage = `${targetEmail} is now pending re-evaluation by the admin.`;
     }
-
 
     saveAccessRequests(updatedRequests);
 
@@ -512,7 +502,7 @@ export default function TeleCheckPage() {
   };
 
   const renderHeaderContent = () => {
-    let icon = <Hourglass className="h-10 w-10 sm:h-12 sm:w-12 text-primary animate-spin" />;
+    let icon: React.ReactNode = <Hourglass className="h-10 w-10 sm:h-12 sm:w-12 text-primary animate-spin" />;
     let title = "Loading Bot...";
     let subtitle = "Please wait while we check your access status.";
     let adminNote;
@@ -530,8 +520,8 @@ export default function TeleCheckPage() {
             adminNote = <p className="mt-2 text-sm text-green-500 font-medium">Access Approved. You can use the checker.</p>;
           }
       } else if (currentUserStatus === "pending_approval") {
-          icon = <Hourglass className="h-10 w-10 sm:h-12 sm:w-12 text-amber-500 animate-spin" />;
-          title = "Request Pending";
+          icon = <MailCheck className="h-10 w-10 sm:h-12 sm:w-12 text-amber-500" />; // Changed from Hourglass for pending
+          title = "Request Pending Review";
           subtitle = "Your access to TeleCheck Bot is awaiting admin approval."
       } else if (currentUserStatus === "revoked") {
           icon = <ShieldAlert className="h-10 w-10 sm:h-12 sm:w-12 text-destructive" />;
@@ -565,8 +555,11 @@ export default function TeleCheckPage() {
     const sortedRequests = [...accessRequests].sort((a, b) => {
         const dateA = a.lastSeen ? parseISO(a.lastSeen).getTime() : 0;
         const dateB = b.lastSeen ? parseISO(b.lastSeen).getTime() : 0;
-        if (dateA !== dateB) return dateB - dateA;
-        return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
+        if (dateA !== dateB) return dateB - dateA; // Most recent lastSeen first
+        // Fallback to requestedAt if lastSeen is same or not present
+        const requestedDateA = parseISO(a.requestedAt).getTime();
+        const requestedDateB = parseISO(b.requestedAt).getTime();
+        return requestedDateB - requestedDateA; // Most recent requests first
     });
 
     return (
@@ -613,7 +606,7 @@ export default function TeleCheckPage() {
                           req.status === "pending_approval" ? "warning" :
                           req.status === "revoked" ? "destructive" : "outline"
                         } className="text-xs px-2 py-0.5">
-                          {req.status.replace("_", " ")}
+                          {req.status.replace(/_/g, " ")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right space-x-1 sm:space-x-2">
@@ -742,7 +735,6 @@ export default function TeleCheckPage() {
     }
 
     if (currentUserStatus === "pending_approval" && currentUserEmail?.toLowerCase() === ADMIN_EMAIL.toLowerCase() && !isAdmin) {
-        // This case is for an admin who somehow got into pending state. Show request form to re-trigger admin approval.
         return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
     }
 
@@ -774,7 +766,6 @@ export default function TeleCheckPage() {
       );
     }
 
-    // Fallback, should ideally be covered by above conditions
     return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
   };
 
@@ -798,7 +789,7 @@ export default function TeleCheckPage() {
         <p className="text-xs mt-1">
             &copy; {new Date().getFullYear()} TeleCheck Bot. All rights reserved.
         </p>
-
+      
         {isClient && process.env.NODE_ENV === 'development' && (
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button variant="link" size="sm" className="text-xs" onClick={() => {
@@ -853,3 +844,6 @@ export default function TeleCheckPage() {
     </div>
   );
 }
+
+
+    
