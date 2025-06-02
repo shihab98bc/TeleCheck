@@ -9,7 +9,7 @@ import { ResultDisplay, type ResultState } from "@/components/telecheck/result-d
 import { RequestAccessForm } from "@/components/telecheck/request-access-form";
 import { PendingApprovalMessage } from "@/components/telecheck/pending-approval-message";
 import { useToast } from "@/hooks/use-toast";
-import { ListChecks, ShieldAlert, UserCheck, Users, ShieldCheck, UserCog, Download, FileSpreadsheet, Moon, Sun, MessageSquare, Phone, Send, ClipboardCopy, Eye } from "lucide-react";
+import { ListChecks, ShieldAlert, UserCheck, Users, ShieldCheck, UserCog, Download, FileSpreadsheet, MessageSquare, Phone, Send, ClipboardCopy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -186,7 +186,7 @@ export default function TeleCheckPage() {
             adminRecord.requestedAt = new Date().toISOString();
         }
     } else {
-        loadedRequests.push({ email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved" });
+        loadedRequests.push({ email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved", lastSeen: new Date().toISOString() });
     }
     
     let finalRequests = [...loadedRequests];
@@ -204,12 +204,22 @@ export default function TeleCheckPage() {
     } else {
       setCurrentUserStatus("needs_approval");
     }
-    saveAccessRequests(finalRequests); // Save updated requests including admin and potential lastSeen update
+    saveAccessRequests(finalRequests); 
   }, [isClient, saveAccessRequests, updateCurrentUserLastSeen]); 
 
 
   const handleRequestAccessSubmit = (data: { email: string }) => {
-    if (!isClient) return; 
+    if (!isClient) return;
+
+    if (!data.email.toLowerCase().endsWith('@gmail.com')) {
+      toast({
+        title: "Access Denied",
+        description: "Only gmail.com email addresses are allowed for access requests.",
+        variant: "destructive",
+      });
+      return; 
+    }
+    
     setIsLoading(true);
     
     const now = new Date().toISOString();
@@ -236,7 +246,7 @@ export default function TeleCheckPage() {
       if (existingRequestIndex > -1) {
         const existingRequest = updatedRequests[existingRequestIndex];
         if (existingRequest.status === 'revoked' || existingRequest.status === 'pending_approval') {
-          updatedRequests[existingRequestIndex] = { ...existingRequest, status: "pending_approval", requestedAt: now, lastSeen: existingRequest.lastSeen }; // Preserve lastSeen
+          updatedRequests[existingRequestIndex] = { ...existingRequest, status: "pending_approval", requestedAt: now, lastSeen: existingRequest.lastSeen }; 
           newStatusForCurrentUser = "pending_approval";
           toast({
             title: "Request Updated",
@@ -244,7 +254,7 @@ export default function TeleCheckPage() {
           });
         } else if (existingRequest.status === 'approved') {
           newStatusForCurrentUser = "approved";
-          newLastSeenForCurrentUser = now; // Update lastSeen on "re-request" if already approved
+          newLastSeenForCurrentUser = now; 
           updatedRequests[existingRequestIndex] = { ...existingRequest, lastSeen: now };
           toast({
             title: "Already Approved",
@@ -282,10 +292,8 @@ export default function TeleCheckPage() {
       req.email === targetEmail ? { ...req, status: newStatus, requestedAt: new Date().toISOString() } : req
     );
     
-    // Prevent revoking the sole admin's access if they are currently the admin
     if (targetEmail === ADMIN_EMAIL && newStatus === "revoked") {
         const adminIsSelfRevoking = currentUserEmail === ADMIN_EMAIL;
-        // Check if there are other approved admin records (though current design implies one ADMIN_EMAIL)
         const otherApprovedAdmins = updatedRequests.filter(r => r.email === ADMIN_EMAIL && r.status === "approved" && r.email !== targetEmail).length;
         
         if (adminIsSelfRevoking && otherApprovedAdmins === 0) {
@@ -300,7 +308,6 @@ export default function TeleCheckPage() {
             }
         }
     }
-     // If approving a user (or admin), update their lastSeen if they are the current user
     if (newStatus === "approved" && targetEmail === currentUserEmail) {
         const userIndex = updatedRequests.findIndex(req => req.email === targetEmail);
         if (userIndex > -1) {
@@ -322,7 +329,6 @@ export default function TeleCheckPage() {
     } else if (targetEmail === ADMIN_EMAIL && newStatus === "approved") {
         toastMessage = `Admin access for ${targetEmail} has been re-affirmed.`;
     }
-
 
     toast({
       title: `User Access ${newStatus === "approved" ? "Approved" : newStatus === "revoked" ? "Updated" : "Set to Pending"}`,
@@ -397,12 +403,10 @@ export default function TeleCheckPage() {
     
     setResults(currentResults.slice().reverse());
 
-    // Update lastSeen for current user after successful submission
     if (currentUserEmail && currentUserStatus === "approved") {
       const updatedReqs = updateCurrentUserLastSeen([...accessRequests], currentUserEmail);
       saveAccessRequests(updatedReqs);
     }
-
 
     const foundCount = currentResults.filter(r => r.status === "found").length;
     const notFoundCount = currentResults.filter(r => r.status === "not_found").length;
@@ -429,7 +433,7 @@ export default function TeleCheckPage() {
     );
 
     const filteredForDownload = downloadable.filter(result => {
-      if (!downloadFilters.found && !downloadFilters.not_found && !downloadFilters.error) return true; // If no filters selected, download all
+      if (!downloadFilters.found && !downloadFilters.not_found && !downloadFilters.error) return true; 
       if (downloadFilters.found && result.status === 'found') return true;
       if (downloadFilters.not_found && result.status === 'not_found') return true;
       if (downloadFilters.error && result.status === 'error') return true;
@@ -472,7 +476,7 @@ export default function TeleCheckPage() {
     if (!isClient || currentUserStatus === "loading") {
       // Keep default loading icon
     } else if (currentUserStatus === "approved") {
-        icon = <UserCheck className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />;
+        icon = <UserCheck className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />; // Use green-500 or a theme variable if defined
         if (isAdmin) {
           title = "TeleCheck Bot - Admin";
           subtitle = "Manage user access and perform bulk checks.";
@@ -481,7 +485,7 @@ export default function TeleCheckPage() {
           adminNote = <p className="mt-2 text-sm text-green-500">Access Approved. You can use the checker.</p>;
         }
     } else if (currentUserStatus === "pending_approval") {
-        icon = <ListChecks className="h-10 w-10 sm:h-12 sm:w-12 text-amber-500" />;
+        icon = <ListChecks className="h-10 w-10 sm:h-12 sm:w-12 text-amber-500" />; // Use amber-500 or a theme variable
         title = "Request Pending";
         subtitle = "Your access to TeleCheck Bot is awaiting admin approval."
     } else if (currentUserStatus === "revoked") {
@@ -514,8 +518,8 @@ export default function TeleCheckPage() {
     const sortedRequests = [...accessRequests].sort((a, b) => {
         const dateA = a.lastSeen ? parseISO(a.lastSeen).getTime() : 0;
         const dateB = b.lastSeen ? parseISO(b.lastSeen).getTime() : 0;
-        if (dateA !== dateB) return dateB - dateA; // Sort by lastSeen desc
-        return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime(); // Then by requestedAt desc
+        if (dateA !== dateB) return dateB - dateA; 
+        return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime(); 
     });
 
     return (
@@ -606,7 +610,7 @@ export default function TeleCheckPage() {
                             Re-evaluate
                           </Button>
                          )}
-                         {req.email === ADMIN_EMAIL && req.status !== "approved" && ( // Admin themselves
+                         {req.email === ADMIN_EMAIL && req.status !== "approved" && ( 
                            <Button 
                             size="sm" 
                             variant="default" 
@@ -800,9 +804,3 @@ export default function TeleCheckPage() {
     </div>
   );
 }
-    
-    
-
-    
-
-    
