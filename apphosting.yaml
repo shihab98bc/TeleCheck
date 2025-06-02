@@ -1,7 +1,7 @@
-# Settings to manage and configure a Firebase App Hosting backend.
-# https://firebase.google.com/docs/app-hosting/configure
+# This file is for Firebase App Hosting.
+# It is not used when deploying to Vercel.
+# Vercel automatically configures Next.js applications.
 
-runConfig:
-  # Increase this value if you'd like to automatically spin up
-  # more instances in response to increased traffic.
-  maxInstances: 1
+# Original content (for reference, but not active for Vercel):
+# runConfig:
+#   maxInstances: 1
