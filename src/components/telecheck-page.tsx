@@ -25,7 +25,6 @@ import { Label } from "@/components/ui/label";
 import { ThemeToggleButton } from "@/components/theme-toggle-button";
 
 
-const MAX_NUMBERS_BULK_CHECK = 10000;
 const ADMIN_EMAIL = "shihab98bc@gmail.com";
 
 type UserStatus = "loading" | "needs_approval" | "pending_approval" | "approved" | "revoked";
@@ -72,7 +71,7 @@ export default function TeleCheckPage() {
   }, [isClient]);
 
   useEffect(() => {
-    if (!isClient) { // Only run on the client
+    if (!isClient) { 
       return;
     }
 
@@ -217,16 +216,6 @@ export default function TeleCheckPage() {
 
     if (numbersToProcess.length === 0) {
       toast({ title: "No Numbers Entered", description: "Please enter valid phone numbers to check.", variant: "destructive" });
-      setIsLoading(false);
-      return;
-    }
-
-    if (numbersToProcess.length > MAX_NUMBERS_BULK_CHECK) {
-      toast({ 
-        title: "Too Many Numbers", 
-        description: `Please enter up to ${MAX_NUMBERS_BULK_CHECK} numbers for bulk check. You entered ${numbersToProcess.length}.`, 
-        variant: "destructive" 
-      });
       setIsLoading(false);
       return;
     }
@@ -376,7 +365,7 @@ export default function TeleCheckPage() {
         <div className="flex items-center justify-center mb-3">
           {icon}
         </div>
-        <h1 className="text-3xl sm:text-4xl font-bold font-headline text-primary">{title}</h1>
+        <h1 className="text-4xl sm:text-5xl font-bold font-headline text-primary">{title}</h1>
         <p className="mt-1 text-md sm:text-lg text-muted-foreground">{subtitle}</p>
         {adminNote}
       </div>
@@ -658,4 +647,3 @@ export default function TeleCheckPage() {
   );
 }
     
-
