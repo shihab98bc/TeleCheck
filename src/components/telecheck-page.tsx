@@ -8,7 +8,7 @@ import { ResultDisplay, type ResultState } from "@/components/telecheck/result-d
 import { RequestAccessForm } from "@/components/telecheck/request-access-form";
 import { PendingApprovalMessage } from "@/components/telecheck/pending-approval-message";
 import { useToast } from "@/hooks/use-toast";
-import { ListChecks, ShieldAlert, UserCheck, Users, ShieldCheck, ServerCrash, UserCog, Download, FileSpreadsheet, Moon, Sun } from "lucide-react";
+import { ListChecks, ShieldAlert, UserCheck, Users, ShieldCheck, ServerCrash, UserCog, Download, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -43,6 +43,7 @@ type DownloadFilters = {
 };
 
 export default function TeleCheckPage() {
+  const [isClient, setIsClient] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [currentUserStatus, setCurrentUserStatus] = useState<UserStatus>("loading");
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
@@ -57,17 +58,23 @@ export default function TeleCheckPage() {
     error: false,
   });
 
-  const isAdmin = currentUserEmail === ADMIN_EMAIL && currentUserStatus === "approved";
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const isAdmin = isClient && currentUserEmail === ADMIN_EMAIL && currentUserStatus === "approved";
 
   const saveAccessRequests = useCallback((updatedRequests: AccessRequest[]) => {
     setAccessRequests(updatedRequests);
-    if (typeof window !== "undefined") {
+    if (isClient) { // Guard localStorage access
       localStorage.setItem("telecheck_accessRequests", JSON.stringify(updatedRequests));
     }
-  }, []);
+  }, [isClient]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!isClient) { // Only run on the client
+      return;
+    }
 
     const storedEmail = localStorage.getItem("telecheck_currentUserEmail");
     setCurrentUserEmail(storedEmail);
@@ -93,10 +100,11 @@ export default function TeleCheckPage() {
         } else {
             requests.push({ email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved" });
         }
+        // If admin record was modified or added, ensure accessRequests state reflects this before setting dependent states.
+        // The saveAccessRequests call will handle updating localStorage.
+        // No, direct setAccessRequests is better here for initial load.
     }
-
-
-    setAccessRequests(requests); 
+    setAccessRequests(requests); // Set initial requests state
 
     if (storedEmail) {
       const userRequest = requests.find(req => req.email === storedEmail);
@@ -112,10 +120,11 @@ export default function TeleCheckPage() {
     } else {
       setCurrentUserStatus("needs_approval");
     }
-  }, [saveAccessRequests]);
+  }, [isClient, saveAccessRequests]);
 
 
   const handleRequestAccessSubmit = (data: { email: string }) => {
+    if (!isClient) return; // Should not happen as form is rendered when isClient is true
     setIsLoading(true);
     
     const now = new Date().toISOString();
@@ -170,7 +179,7 @@ export default function TeleCheckPage() {
     }
 
     saveAccessRequests(updatedRequests);
-    if (typeof window !== "undefined") {
+    if (isClient) {
       localStorage.setItem("telecheck_currentUserEmail", data.email);
     }
     setCurrentUserEmail(data.email);
@@ -179,6 +188,7 @@ export default function TeleCheckPage() {
   };
 
   const handleAdminAction = (targetEmail: string, newStatus: UserStatus) => {
+    if (!isClient) return; // Should not happen
     let updatedRequests = accessRequests.map(req =>
       req.email === targetEmail ? { ...req, status: newStatus, requestedAt: new Date().toISOString() } : req
     );
@@ -338,7 +348,9 @@ export default function TeleCheckPage() {
     let subtitle = "Bulk check Telegram account status quickly and easily.";
     let adminNote;
 
-    if (currentUserStatus === "approved") {
+    if (!isClient || currentUserStatus === "loading") {
+        // Default or loading header
+    } else if (currentUserStatus === "approved") {
         icon = <UserCheck className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />;
         if (isAdmin) {
           title = "TeleCheck Bot - Admin";
@@ -361,7 +373,6 @@ export default function TeleCheckPage() {
         subtitle = "Please request access to use the TeleCheck Bot."
     }
 
-
     return (
       <div className="text-center">
         <div className="flex items-center justify-center mb-3">
@@ -375,7 +386,7 @@ export default function TeleCheckPage() {
   };
 
   const renderAdminPanel = () => {
-    if (!isAdmin) {
+    if (!isAdmin) { // isAdmin already checks for isClient
       return null;
     }
 
@@ -479,6 +490,8 @@ export default function TeleCheckPage() {
   };
 
   const renderDownloadSection = () => {
+    if (!isClient) return null; // Ensure this doesn't render prematurely
+
     const downloadableResultsExist = results.some(r => r.phoneNumber && (r.status === 'found' || r.status === 'not_found' || r.status === 'error'));
     if (!downloadableResultsExist || currentUserStatus !== "approved") {
       return null;
@@ -521,7 +534,7 @@ export default function TeleCheckPage() {
 
 
   const renderContent = () => {
-    if (typeof window !== "undefined" && currentUserStatus === "loading") {
+    if (!isClient || currentUserStatus === "loading") {
       return (
         <div className="flex flex-col items-center justify-center mt-10">
           <ListChecks className="h-12 w-12 text-primary animate-spin mb-4" />
@@ -538,7 +551,6 @@ export default function TeleCheckPage() {
       return <PendingApprovalMessage userEmail={currentUserEmail || undefined} adminEmail={ADMIN_EMAIL} />;
     }
     
-    // If admin is pending, show request form so they can get auto-approved
     if (currentUserStatus === "pending_approval" && currentUserEmail === ADMIN_EMAIL) {
         return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
     }
@@ -571,7 +583,6 @@ export default function TeleCheckPage() {
       );
     }
     
-    // Default fallback if no other condition is met (should ideally not be reached if logic is sound)
     return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
   };
 
@@ -583,11 +594,11 @@ export default function TeleCheckPage() {
           {renderHeaderContent()}
         </div>
         <div className="flex-1 flex justify-end">
-          <ThemeToggleButton />
+          {isClient && <ThemeToggleButton />} {/* Render ThemeToggleButton only on client */}
         </div>
       </header>
       <main className="w-full flex flex-col items-center">
-        {isAdmin && renderAdminPanel()}
+        {isAdmin && renderAdminPanel()} {/* isAdmin already checks for isClient */}
         {renderContent()}
       </main>
       <footer className="mt-12 mb-6 text-center text-muted-foreground">
@@ -597,10 +608,10 @@ export default function TeleCheckPage() {
         <p className="text-xs mt-1">
             &copy; {new Date().getFullYear()} TeleCheck Bot. All rights reserved.
         </p>
-        {process.env.NODE_ENV === 'development' && (
+        {isClient && process.env.NODE_ENV === 'development' && ( // Guard dev buttons with isClient
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button variant="link" size="sm" className="text-xs" onClick={() => {
-              if (typeof window !== "undefined") {
+              if (typeof window !== "undefined") { // Still good practice for direct localStorage manipulation
                 localStorage.removeItem("telecheck_accessRequests");
                 localStorage.removeItem("telecheck_currentUserEmail");
               }
