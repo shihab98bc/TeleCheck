@@ -8,7 +8,7 @@ import { ResultDisplay, type ResultState } from "@/components/telecheck/result-d
 import { RequestAccessForm } from "@/components/telecheck/request-access-form";
 import { PendingApprovalMessage } from "@/components/telecheck/pending-approval-message";
 import { useToast } from "@/hooks/use-toast";
-import { ListChecks, ShieldAlert, UserCheck, Users, ShieldCheck, ServerCrash, UserCog, Download, FileSpreadsheet } from "lucide-react";
+import { ListChecks, ShieldAlert, UserCheck, Users, ShieldCheck, ServerCrash, UserCog, Download, FileSpreadsheet, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -22,6 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { ThemeToggleButton } from "@/components/theme-toggle-button";
 
 
 const MAX_NUMBERS_BULK_CHECK = 500;
@@ -58,17 +59,26 @@ export default function TeleCheckPage() {
 
   const saveAccessRequests = useCallback((updatedRequests: AccessRequest[]) => {
     setAccessRequests(updatedRequests);
-    localStorage.setItem("telecheck_accessRequests", JSON.stringify(updatedRequests));
+    if (typeof window !== "undefined") {
+      localStorage.setItem("telecheck_accessRequests", JSON.stringify(updatedRequests));
+    }
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const storedEmail = localStorage.getItem("telecheck_currentUserEmail");
     setCurrentUserEmail(storedEmail);
 
     let requests: AccessRequest[] = [];
     const storedRequests = localStorage.getItem("telecheck_accessRequests");
     if (storedRequests) {
-      requests = JSON.parse(storedRequests);
+      try {
+        requests = JSON.parse(storedRequests);
+      } catch (e) {
+        console.error("Failed to parse access requests from localStorage", e);
+        requests = [];
+      }
     }
     
     if (storedEmail === ADMIN_EMAIL) {
@@ -158,7 +168,9 @@ export default function TeleCheckPage() {
     }
 
     saveAccessRequests(updatedRequests);
-    localStorage.setItem("telecheck_currentUserEmail", data.email);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("telecheck_currentUserEmail", data.email);
+    }
     setCurrentUserEmail(data.email);
     setCurrentUserStatus(newStatusForCurrentUser); 
     setIsLoading(false);
@@ -318,45 +330,45 @@ export default function TeleCheckPage() {
       });
   };
   
-  const renderHeader = () => {
-    let icon = <ListChecks className="h-12 w-12 sm:h-16 sm:w-16 text-primary animate-pulse" />;
+  const renderHeaderContent = () => {
+    let icon = <ListChecks className="h-10 w-10 sm:h-12 sm:w-12 text-primary animate-pulse" />;
     let title = "TeleCheck Bot";
     let subtitle = "Bulk check Telegram account status quickly and easily.";
     let adminNote;
 
     if (currentUserStatus === "approved") {
-        icon = <UserCheck className="h-12 w-12 sm:h-16 sm:w-16 text-green-500" />;
+        icon = <UserCheck className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />;
         if (currentUserEmail === ADMIN_EMAIL) {
           title = "TeleCheck Bot - Admin";
           subtitle = "Manage user access and perform bulk checks.";
-          adminNote = <p className="mt-3 text-sm text-green-500">Admin access active.</p>;
+          adminNote = <p className="mt-2 text-sm text-green-500">Admin access active.</p>;
         } else {
-          adminNote = <p className="mt-3 text-sm text-green-500">Access Approved. You can use the checker.</p>;
+          adminNote = <p className="mt-2 text-sm text-green-500">Access Approved. You can use the checker.</p>;
         }
     } else if (currentUserStatus === "pending_approval") {
-        icon = <ListChecks className="h-12 w-12 sm:h-16 sm:w-16 text-amber-500" />;
+        icon = <ListChecks className="h-10 w-10 sm:h-12 sm:w-12 text-amber-500" />;
         title = "Request Pending";
         subtitle = "Your access to TeleCheck Bot is awaiting admin approval."
     } else if (currentUserStatus === "revoked") {
-        icon = <ShieldAlert className="h-12 w-12 sm:h-16 sm:w-16 text-destructive" />;
+        icon = <ShieldAlert className="h-10 w-10 sm:h-12 sm:w-12 text-destructive" />;
         title = "Access Revoked";
         subtitle = "Your access to TeleCheck Bot has been revoked. Please contact the admin.";
     } else if (currentUserStatus === "needs_approval") {
-        icon = <ShieldAlert className="h-12 w-12 sm:h-16 sm:w-16 text-destructive" />;
+        icon = <ShieldAlert className="h-10 w-10 sm:h-12 sm:w-12 text-destructive" />;
         title = "Access Required";
         subtitle = "Please request access to use the TeleCheck Bot."
     }
 
 
     return (
-      <header className="my-8 sm:my-10 text-center">
-        <div className="flex items-center justify-center mb-4">
+      <div className="text-center">
+        <div className="flex items-center justify-center mb-3">
           {icon}
         </div>
-        <h1 className="text-4xl sm:text-5xl font-bold font-headline text-primary">{title}</h1>
-        <p className="mt-2 text-lg sm:text-xl text-muted-foreground">{subtitle}</p>
+        <h1 className="text-3xl sm:text-4xl font-bold font-headline text-primary">{title}</h1>
+        <p className="mt-1 text-md sm:text-lg text-muted-foreground">{subtitle}</p>
         {adminNote}
-      </header>
+      </div>
     );
   };
 
@@ -507,7 +519,7 @@ export default function TeleCheckPage() {
 
 
   const renderContent = () => {
-    if (currentUserStatus === "loading") {
+    if (typeof window !== "undefined" && currentUserStatus === "loading") {
       return (
         <div className="flex flex-col items-center justify-center mt-10">
           <ListChecks className="h-12 w-12 text-primary animate-spin mb-4" />
@@ -561,7 +573,15 @@ export default function TeleCheckPage() {
 
   return (
     <div className="flex flex-col items-center justify-start min-h-screen p-4 sm:p-6 lg:p-8 bg-background text-foreground">
-      {renderHeader()}
+      <header className="w-full flex justify-between items-start pt-6 sm:pt-8 pb-8 sm:pb-10 px-4 sm:px-0">
+        <div className="flex-1"></div> {/* Spacer to help center title if needed or for future left items */}
+        <div className="flex-1 flex justify-center">
+          {renderHeaderContent()}
+        </div>
+        <div className="flex-1 flex justify-end">
+          <ThemeToggleButton />
+        </div>
+      </header>
       <main className="w-full flex flex-col items-center">
         {currentUserEmail === ADMIN_EMAIL && currentUserStatus === "approved" && renderAdminPanel()}
         {renderContent()}
@@ -576,8 +596,10 @@ export default function TeleCheckPage() {
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button variant="link" size="sm" className="text-xs" onClick={() => {
-              localStorage.removeItem("telecheck_accessRequests");
-              localStorage.removeItem("telecheck_currentUserEmail");
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("telecheck_accessRequests");
+                localStorage.removeItem("telecheck_currentUserEmail");
+              }
               setCurrentUserEmail(null);
               setAccessRequests([]);
               setCurrentUserStatus("needs_approval"); 
@@ -622,8 +644,4 @@ export default function TeleCheckPage() {
     </div>
   );
 }
-    
-
-    
-
     
