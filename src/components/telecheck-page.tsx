@@ -57,6 +57,8 @@ export default function TeleCheckPage() {
     error: false,
   });
 
+  const isAdmin = currentUserEmail === ADMIN_EMAIL && currentUserStatus === "approved";
+
   const saveAccessRequests = useCallback((updatedRequests: AccessRequest[]) => {
     setAccessRequests(updatedRequests);
     if (typeof window !== "undefined") {
@@ -338,7 +340,7 @@ export default function TeleCheckPage() {
 
     if (currentUserStatus === "approved") {
         icon = <UserCheck className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />;
-        if (currentUserEmail === ADMIN_EMAIL) {
+        if (isAdmin) {
           title = "TeleCheck Bot - Admin";
           subtitle = "Manage user access and perform bulk checks.";
           adminNote = <p className="mt-2 text-sm text-green-500">Admin access active.</p>;
@@ -373,7 +375,7 @@ export default function TeleCheckPage() {
   };
 
   const renderAdminPanel = () => {
-    if (currentUserEmail !== ADMIN_EMAIL || currentUserStatus !== "approved") {
+    if (!isAdmin) {
       return null;
     }
 
@@ -528,15 +530,19 @@ export default function TeleCheckPage() {
       );
     }
 
-    const isAdmin = currentUserEmail === ADMIN_EMAIL && currentUserStatus === "approved";
-
     if (currentUserStatus === "needs_approval" || currentUserStatus === "revoked") {
       return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
     }
 
-    if (currentUserStatus === "pending_approval" && currentUserEmail !== ADMIN_EMAIL) { 
+    if (currentUserStatus === "pending_approval" && !isAdmin && currentUserEmail !== ADMIN_EMAIL) { 
       return <PendingApprovalMessage userEmail={currentUserEmail || undefined} adminEmail={ADMIN_EMAIL} />;
     }
+    
+    // If admin is pending, show request form so they can get auto-approved
+    if (currentUserStatus === "pending_approval" && currentUserEmail === ADMIN_EMAIL) {
+        return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
+    }
+
 
     if (currentUserStatus === "approved") {
       return (
@@ -565,9 +571,7 @@ export default function TeleCheckPage() {
       );
     }
     
-    if (currentUserEmail === ADMIN_EMAIL && currentUserStatus === "pending_approval") {
-        return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
-    }
+    // Default fallback if no other condition is met (should ideally not be reached if logic is sound)
     return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
   };
 
@@ -583,7 +587,7 @@ export default function TeleCheckPage() {
         </div>
       </header>
       <main className="w-full flex flex-col items-center">
-        {currentUserEmail === ADMIN_EMAIL && currentUserStatus === "approved" && renderAdminPanel()}
+        {isAdmin && renderAdminPanel()}
         {renderContent()}
       </main>
       <footer className="mt-12 mb-6 text-center text-muted-foreground">
