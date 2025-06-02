@@ -54,60 +54,44 @@ export default function TeleCheckPage() {
     const storedRequests = localStorage.getItem("telecheck_accessRequests");
     if (storedRequests) {
       requests = JSON.parse(storedRequests);
-      setAccessRequests(requests);
     }
+    
+    // Ensure admin always has an approved record if they are the current user
+    // or if no requests exist yet and admin is interacting
+    if (storedEmail === ADMIN_EMAIL) {
+        let adminRecord = requests.find(req => req.email === ADMIN_EMAIL);
+        if (adminRecord) {
+            if (adminRecord.status !== "approved") {
+                adminRecord.status = "approved"; // Ensure admin is always approved
+                adminRecord.requestedAt = new Date().toISOString();
+            }
+        } else {
+            requests.push({ email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved" });
+        }
+    } else if (requests.length === 0 && storedEmail === null && ADMIN_EMAIL) { 
+        // Scenario: No stored user, no requests, perhaps admin is first-time "visiting"
+        // This case is less likely now with auto-approval on request, but good for robustness
+    }
+
+
+    setAccessRequests(requests); // Set requests before deriving current user status
 
     if (storedEmail) {
       const userRequest = requests.find(req => req.email === storedEmail);
       if (userRequest) {
         setCurrentUserStatus(userRequest.status);
       } else {
-        // If email is stored but no matching request (e.g. after a reset of requests but not email)
-        setCurrentUserStatus("needs_approval");
-      }
-    } else {
-      setCurrentUserStatus("needs_approval");
-    }
-  }, []);
-
-
-  // Effect to handle initial admin setup or derive current user status
-  useEffect(() => {
-    const storedUserEmail = localStorage.getItem("telecheck_currentUserEmail");
-    const storedRequestsStr = localStorage.getItem("telecheck_accessRequests");
-    let currentRequests: AccessRequest[] = storedRequestsStr ? JSON.parse(storedRequestsStr) : [];
-
-    if (storedUserEmail) {
-      setCurrentUserEmail(storedUserEmail);
-      let userRecord = currentRequests.find(req => req.email === storedUserEmail);
-
-      if (userRecord) {
-        setCurrentUserStatus(userRecord.status);
-      } else {
-        // User email exists, but no record, implies they need to request access
-        // Or, if it's the admin and their record is missing, re-create and approve
-        if (storedUserEmail === ADMIN_EMAIL) {
-           userRecord = { email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved" };
-           currentRequests = [...currentRequests.filter(req => req.email !== ADMIN_EMAIL), userRecord];
-           localStorage.setItem("telecheck_accessRequests", JSON.stringify(currentRequests));
-           setAccessRequests(currentRequests);
-           setCurrentUserStatus("approved");
+         // If it's the admin and their record was just created above, reflect approved status
+        if (storedEmail === ADMIN_EMAIL) {
+            setCurrentUserStatus("approved");
         } else {
-          setCurrentUserStatus("needs_approval");
+            setCurrentUserStatus("needs_approval");
         }
       }
     } else {
       setCurrentUserStatus("needs_approval");
     }
-    
-    // Ensure admin always has an approved record if they are the current user and no records exist
-    if (storedUserEmail === ADMIN_EMAIL && currentRequests.length === 0) {
-        const adminRequest: AccessRequest = { email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved" };
-        saveAccessRequests([adminRequest]);
-        setCurrentUserStatus("approved");
-    }
-
-  }, [saveAccessRequests]);
+  }, [saveAccessRequests]); // Removed ADMIN_EMAIL from dependency array as it's a constant
 
 
   const handleRequestAccessSubmit = (data: { email: string }) => {
@@ -116,68 +100,93 @@ export default function TeleCheckPage() {
     const now = new Date().toISOString();
     let updatedRequests = [...accessRequests];
     const existingRequestIndex = updatedRequests.findIndex(req => req.email === data.email);
+    let newStatusForCurrentUser: UserStatus = "pending_approval";
 
-    if (existingRequestIndex > -1) {
-      // User is re-requesting or admin is re-triggering
-      if(updatedRequests[existingRequestIndex].status === 'revoked' || updatedRequests[existingRequestIndex].status === 'pending_approval' || data.email === ADMIN_EMAIL) {
-        updatedRequests[existingRequestIndex] = { ...updatedRequests[existingRequestIndex], status: "pending_approval", requestedAt: now };
-         toast({
-          title: "Request Updated",
-          description: `Your access request for ${data.email} has been re-submitted.`,
-        });
-      } else if (updatedRequests[existingRequestIndex].status === 'approved') {
-         toast({
-          title: "Already Approved",
-          description: `Access for ${data.email} is already approved.`,
-          variant: "default",
-        });
-        setIsLoading(false);
-        localStorage.setItem("telecheck_currentUserEmail", data.email);
-        setCurrentUserEmail(data.email);
-        setCurrentUserStatus("approved");
-        return;
+    if (data.email === ADMIN_EMAIL) {
+      newStatusForCurrentUser = "approved"; // Auto-approve admin
+      if (existingRequestIndex > -1) {
+        updatedRequests[existingRequestIndex] = { ...updatedRequests[existingRequestIndex], status: "approved", requestedAt: now };
       } else {
-         toast({
-          title: "Request Status",
-          description: `An existing request for ${data.email} is currently ${updatedRequests[existingRequestIndex].status}.`,
-        });
-        setIsLoading(false);
-        return;
+        updatedRequests.push({ email: data.email, requestedAt: now, status: "approved" });
       }
-    } else {
-      // New request
-      updatedRequests.push({ email: data.email, requestedAt: now, status: "pending_approval" });
       toast({
-        title: "Request Submitted",
-        description: `Your access request for ${data.email} has been sent to the admin.`,
+        title: "Admin Access Granted",
+        description: "Welcome, Admin! Your access is automatically approved.",
+        variant: "default",
       });
+    } else {
+      // Handle non-admin user requests
+      if (existingRequestIndex > -1) {
+        const existingRequest = updatedRequests[existingRequestIndex];
+        if (existingRequest.status === 'revoked' || existingRequest.status === 'pending_approval') {
+          updatedRequests[existingRequestIndex] = { ...existingRequest, status: "pending_approval", requestedAt: now };
+          newStatusForCurrentUser = "pending_approval";
+          toast({
+            title: "Request Updated",
+            description: `Your access request for ${data.email} has been re-submitted.`,
+          });
+        } else if (existingRequest.status === 'approved') {
+          newStatusForCurrentUser = "approved";
+          toast({
+            title: "Already Approved",
+            description: `Access for ${data.email} is already approved.`,
+            variant: "default",
+          });
+        } else { // e.g. needs_approval, should not happen if existing
+          newStatusForCurrentUser = existingRequest.status; 
+           toast({
+            title: "Request Status",
+            description: `An existing request for ${data.email} is currently ${existingRequest.status}.`,
+          });
+        }
+      } else {
+        // New non-admin request
+        updatedRequests.push({ email: data.email, requestedAt: now, status: "pending_approval" });
+        newStatusForCurrentUser = "pending_approval";
+        toast({
+          title: "Request Submitted",
+          description: `Your access request for ${data.email} has been sent to the admin.`,
+        });
+      }
     }
 
     saveAccessRequests(updatedRequests);
     localStorage.setItem("telecheck_currentUserEmail", data.email);
     setCurrentUserEmail(data.email);
-    setCurrentUserStatus("pending_approval"); // User is now pending
+    setCurrentUserStatus(newStatusForCurrentUser); 
     setIsLoading(false);
   };
 
   const handleAdminAction = (targetEmail: string, newStatus: UserStatus) => {
-    const updatedRequests = accessRequests.map(req =>
+    let updatedRequests = accessRequests.map(req =>
       req.email === targetEmail ? { ...req, status: newStatus, requestedAt: new Date().toISOString() } : req
     );
+     // If admin revokes their own access (for testing), ensure they can still re-approve
+    if (targetEmail === ADMIN_EMAIL && newStatus !== "approved") {
+       // This scenario is typically handled by dev buttons, but as a safeguard:
+       // Admin should not be able to revoke their own access to a point where they cannot log back in
+       // The main check ensures admin is always "approved" if they are the current user.
+       // However, if we explicitly allow revoking admin for dev testing:
+       // updatedRequests = updatedRequests.map(req => 
+       //  req.email === ADMIN_EMAIL ? { ...req, status: newStatus } : req);
+    }
+
+
     saveAccessRequests(updatedRequests);
 
-    // If admin changes their own status, reflect it immediately
-    if (targetEmail === ADMIN_EMAIL && targetEmail === currentUserEmail) {
-        setCurrentUserStatus(newStatus);
-    }
-    // If admin changes status of current non-admin user viewing the page (unlikely scenario but good to handle)
+    // If admin changes status of current non-admin user viewing the page
     if (targetEmail === currentUserEmail && currentUserEmail !== ADMIN_EMAIL) {
       setCurrentUserStatus(newStatus);
     }
+    // If admin changes their own status AND they are the current user
+    if (targetEmail === currentUserEmail && targetEmail === ADMIN_EMAIL) {
+        setCurrentUserStatus(newStatus); // Reflect admin's own status change immediately
+    }
+
 
     toast({
-      title: `User ${newStatus === "approved" ? "Approved" : "Access Revoked"}`,
-      description: `Access for ${targetEmail} has been ${newStatus}.`,
+      title: `User Access ${newStatus === "approved" ? "Approved" : newStatus === "revoked" ? "Revoked" : "Updated"}`,
+      description: `Access for ${targetEmail} has been set to ${newStatus.replace("_", " ")}.`,
     });
   };
 
@@ -213,7 +222,7 @@ export default function TeleCheckPage() {
     let processedCount = 0;
 
     for (const phoneNumber of numbersToProcess) {
-      await new Promise(resolve => setTimeout(resolve, 250)); // Shorter delay for faster bulk processing
+      await new Promise(resolve => setTimeout(resolve, 250)); 
 
       let singleResult: ResultState;
       const isValidPhoneNumber = /^\+?[1-9]\d{1,14}$/.test(phoneNumber);
@@ -225,7 +234,6 @@ export default function TeleCheckPage() {
             phoneNumber: phoneNumber
         };
       } else {
-        // Simulate API call - In real app, this would be a backend call
         const randomNumber = Math.random();
         if (randomNumber < 0.6) { 
           singleResult = {
@@ -242,19 +250,17 @@ export default function TeleCheckPage() {
         } else { 
           singleResult = {
             status: "error",
-            message: "Simulated error checking this number.", // Updated error message
+            message: "Simulated error checking this number.",
             phoneNumber: phoneNumber
           };
         }
       }
       currentResults.push(singleResult);
       processedCount++;
-      // Optimized result update: show running total and then the individual results
       const processingMessage: ResultState = { status: "processing", message: `Checked ${processedCount}/${numbersToProcess.length} numbers...` };
       setResults([processingMessage, ...currentResults.slice().reverse()]);
     }
     
-    // Final results without the "processing..." message
     setResults(currentResults.slice().reverse());
 
     const foundCount = currentResults.filter(r => r.status === "found").length;
@@ -332,8 +338,8 @@ export default function TeleCheckPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {sortedRequests.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No access requests yet.</p>
+          {sortedRequests.length === 0 || (sortedRequests.length === 1 && sortedRequests[0].email === ADMIN_EMAIL && sortedRequests[0].status === 'approved') ? (
+            <p className="text-muted-foreground text-center py-4">No other user access requests yet.</p>
           ) : (
             <Table>
               <TableHeader>
@@ -359,17 +365,16 @@ export default function TeleCheckPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      {req.status !== "approved" && (
+                      {req.email !== ADMIN_EMAIL && req.status !== "approved" && (
                         <Button 
                           size="sm" 
                           variant="outline"
                           onClick={() => handleAdminAction(req.email, "approved")}
-                          disabled={req.email === ADMIN_EMAIL && req.status === 'approved'} // Admin can't de-approve self this way
                         >
                           Approve
                         </Button>
                       )}
-                      {req.status === "approved" && req.email !== ADMIN_EMAIL && (
+                      {req.email !== ADMIN_EMAIL && req.status === "approved" && (
                         <Button 
                           size="sm" 
                           variant="destructive"
@@ -378,22 +383,31 @@ export default function TeleCheckPage() {
                           Revoke
                         </Button>
                       )}
-                       {req.status === "pending_approval" && (
+                       {req.email !== ADMIN_EMAIL && req.status === "pending_approval" && (
                         <Button 
                           size="sm" 
                           variant="destructive"
-                          onClick={() => handleAdminAction(req.email, "revoked")}
+                          onClick={() => handleAdminAction(req.email, "revoked")} // Rejecting also sets to revoked
                         >
                           Reject
                         </Button>
                       )}
-                       {req.status === "revoked" && req.email !== ADMIN_EMAIL && (
+                       {req.email !== ADMIN_EMAIL && req.status === "revoked" && (
                          <Button 
                           size="sm" 
                           variant="outline"
                           onClick={() => handleAdminAction(req.email, "pending_approval")}
                         >
                           Re-evaluate
+                        </Button>
+                       )}
+                       {req.email === ADMIN_EMAIL && req.status !== "approved" && (
+                         <Button 
+                          size="sm" 
+                          variant="default" // Admin can always re-approve themselves
+                          onClick={() => handleAdminAction(req.email, "approved")}
+                        >
+                          Re-Approve Admin
                         </Button>
                        )}
                     </TableCell>
@@ -418,21 +432,20 @@ export default function TeleCheckPage() {
       );
     }
 
-    // Admin panel is rendered above other content if admin is logged in and approved
     const isAdmin = currentUserEmail === ADMIN_EMAIL && currentUserStatus === "approved";
 
     if (currentUserStatus === "needs_approval" || currentUserStatus === "revoked") {
+       // If admin's status is revoked (e.g. through dev tools), still show request form
       return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
     }
 
-    if (currentUserStatus === "pending_approval") {
+    if (currentUserStatus === "pending_approval" && currentUserEmail !== ADMIN_EMAIL) { // Admin doesn't see pending for self
       return <PendingApprovalMessage userEmail={currentUserEmail || undefined} adminEmail={ADMIN_EMAIL} />;
     }
 
     if (currentUserStatus === "approved") {
       return (
         <>
-          {/* API Credentials info card - emphasizing server-side nature */}
            {!isAdmin && (
             <Card className="w-full max-w-md mb-8 shadow-lg bg-card border-primary/50">
               <CardHeader>
@@ -455,9 +468,12 @@ export default function TeleCheckPage() {
         </>
       );
     }
-    return ( // Fallback for unexpected status, or if needs_approval wasn't caught
-         <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />
-    );
+    // Fallback for unexpected status, or if needs_approval wasn't caught (e.g. admin pending)
+    // If admin is current user and status is pending (should be auto-approved, but as fallback)
+    if (currentUserEmail === ADMIN_EMAIL && currentUserStatus === "pending_approval") {
+        return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
+    }
+    return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
   };
 
   return (
@@ -481,28 +497,43 @@ export default function TeleCheckPage() {
               localStorage.removeItem("telecheck_currentUserEmail");
               setCurrentUserEmail(null);
               setAccessRequests([]);
-              setCurrentUserStatus("needs_approval");
+              setCurrentUserStatus("needs_approval"); // Go back to initial state
               setResults([]);
               toast({title: "Dev: Full Reset", description: "All access requests and current user email cleared.", variant: "default"})
             }}>
               (Dev: Full Reset)
             </Button>
              <Button variant="link" size="sm" className="text-xs" onClick={() => {
-              if(currentUserEmail === ADMIN_EMAIL){
                 handleAdminAction(ADMIN_EMAIL, "approved");
-              } else {
-                 toast({title: "Dev: Not Admin", description: "Current user is not admin.", variant: "destructive"})
-              }
+                // Also ensure current user is admin and status is approved
+                if (currentUserEmail !== ADMIN_EMAIL || currentUserStatus !== "approved") {
+                    setCurrentUserEmail(ADMIN_EMAIL);
+                    setCurrentUserStatus("approved");
+                     // Ensure admin record exists and is approved
+                    let adminRecord = accessRequests.find(req => req.email === ADMIN_EMAIL);
+                    if (adminRecord) {
+                        if (adminRecord.status !== "approved") {
+                            saveAccessRequests(accessRequests.map(r => r.email === ADMIN_EMAIL ? {...r, status: "approved", requestedAt: new Date().toISOString()} : r));
+                        }
+                    } else {
+                        saveAccessRequests([...accessRequests, {email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved"}]);
+                    }
+                }
+                 toast({title: "Dev: Admin Re-Approved", description: `${ADMIN_EMAIL} set to approved.`, variant: "default"})
             }}>
-              (Dev: Approve Admin)
+              (Dev: Ensure Admin Approved)
             </Button>
              <Button variant="link" size="sm" className="text-xs" onClick={() => {
-              if(currentUserEmail){
+              if(currentUserEmail && currentUserEmail !== ADMIN_EMAIL){
                 handleAdminAction(currentUserEmail, "approved");
                  toast({title: "Dev: Current User Approved", description: `${currentUserEmail} approved. Refresh if UI doesn't update.`, variant: "default"})
+              } else if (currentUserEmail === ADMIN_EMAIL) {
+                 toast({title: "Dev: Admin is Current User", description: `Admin is already approved. Use 'Ensure Admin Approved' if needed.`, variant: "default"})
+              } else {
+                 toast({title: "Dev: No Current User", description: `No user to approve. Request access first.`, variant: "destructive"})
               }
             }}>
-              (Dev: Approve Current User)
+              (Dev: Approve Current Non-Admin)
             </Button>
           </div>
         )}
@@ -510,5 +541,6 @@ export default function TeleCheckPage() {
     </div>
   );
 }
+    
 
     
