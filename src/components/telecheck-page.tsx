@@ -14,7 +14,7 @@ type ApiCredentials = {
   apiHash: string;
 };
 
-const MAX_NUMBERS_BULK_CHECK = 20; // Limit for bulk check
+const MAX_NUMBERS_BULK_CHECK = 500; // Limit for bulk check
 
 export default function TeleCheckPage() {
   const [apiCredentials, setApiCredentials] = useState<ApiCredentials | null>(null);
