@@ -1,9 +1,14 @@
 
 "use client";
 
+// This component is no longer used as the admin approval system has been removed.
+// Users get immediate access after email submission.
+// Keeping the file for historical reference or potential future re-purposing if needed.
+// If you are sure it's not needed, you can delete this file.
+
 import type * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Hourglass, MailCheck, UserCheck } from "lucide-react";
+import { Hourglass, MailCheck } from "lucide-react";
 
 type PendingApprovalMessageProps = {
   userEmail?: string;
@@ -16,29 +21,19 @@ export function PendingApprovalMessage({ userEmail, adminEmail }: PendingApprova
       <CardHeader className="items-center text-center">
         <MailCheck className="h-12 w-12 text-primary mb-3" />
         <CardTitle className="text-2xl font-headline">
-          Request Submitted & Pending Review
+          Access Granted!
         </CardTitle>
         {userEmail && (
           <CardDescription className="text-base">
-            Your access request for <span className="font-semibold text-accent">{userEmail}</span> has been submitted.
+            You can now use the TeleCheck Bot with <span className="font-semibold text-accent">{userEmail}</span>.
           </CardDescription>
         )}
       </CardHeader>
       <CardContent className="text-center">
-        <div className="flex items-center justify-center mb-4">
-          <Hourglass className="mr-2 h-6 w-6 text-amber-500 animate-spin" />
-          <p className="text-lg text-amber-500">Awaiting Admin Approval</p>
-        </div>
         <p className="text-muted-foreground">
-          The site administrator (<span className="font-medium text-foreground">{adminEmail}</span>) will review your request.
-          You will be able to use the TeleCheck Bot once your request is approved.
-        </p>
-        <p className="mt-4 text-sm text-muted-foreground">
-            Please check back later or contact the administrator if you have any questions.
+          The admin approval step has been removed. Enjoy using the tool!
         </p>
       </CardContent>
     </Card>
   );
 }
-
-  

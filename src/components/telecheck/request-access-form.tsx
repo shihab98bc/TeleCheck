@@ -16,14 +16,14 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, Send, ShieldQuestion } from "lucide-react";
+import { Mail, Send, LogIn } from "lucide-react"; // Changed ShieldQuestion to LogIn
 
 const formSchema = z.object({
   email: z.string().email("Please enter a valid email address."),
 });
 
 type RequestAccessFormProps = {
-  onSubmit: (data: z.infer<typeof formSchema>) => void;
+  onSubmit: (data: z.infer<typeof formSchema>) => void; // Renamed from onSubmit to onRegisterSubmit or similar if preferred elsewhere
   isLoading: boolean;
 };
 
@@ -37,12 +37,11 @@ export function RequestAccessForm({ onSubmit, isLoading }: RequestAccessFormProp
     <Card className="w-full max-w-md shadow-xl">
       <CardHeader>
         <CardTitle className="flex items-center text-2xl font-headline">
-          <ShieldQuestion className="mr-2 h-8 w-8 text-primary" />
-          Request Access
+          <LogIn className="mr-2 h-8 w-8 text-primary" /> {/* Changed Icon */}
+          Enter Email to Use Bot
         </CardTitle>
         <CardDescription>
-          To use TeleCheck Bot, please enter your email to request access. 
-          Your request will be reviewed by the site administrator.
+          Please enter your Gmail address to start using the TeleCheck Bot. Access is granted immediately.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -53,11 +52,11 @@ export function RequestAccessForm({ onSubmit, isLoading }: RequestAccessFormProp
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-base">Your Email</FormLabel>
+                  <FormLabel className="text-base">Your Gmail Address</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                      <Input type="email" placeholder="Enter your email address" {...field} className="pl-10" />
+                      <Input type="email" placeholder="Enter your gmail.com email" {...field} className="pl-10" />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -68,12 +67,12 @@ export function RequestAccessForm({ onSubmit, isLoading }: RequestAccessFormProp
               {isLoading ? (
                 <>
                   <Send className="mr-2 h-5 w-5 animate-ping" />
-                  Sending Request...
+                  Processing...
                 </>
               ) : (
                 <>
-                  <Send className="mr-2 h-5 w-5" />
-                  Request Access
+                  <LogIn className="mr-2 h-5 w-5" /> 
+                  Access Bot
                 </>
               )}
             </Button>
@@ -83,5 +82,4 @@ export function RequestAccessForm({ onSubmit, isLoading }: RequestAccessFormProp
     </Card>
   );
 }
-
   
