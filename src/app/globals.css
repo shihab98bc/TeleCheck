@@ -9,25 +9,25 @@ body {
 
 @layer base {
   :root {
-    /* Glow Orange Theme - Light Mode (Orange on Dark) */
-    --background: 20 10% 15%; /* Very dark, slightly warm gray */
-    --foreground: 30 50% 90%; /* Light, slightly warm gray/off-white */
-    --card: 20 10% 20%; /* Darker card, slightly lighter than bg */
-    --card-foreground: 30 50% 90%;
-    --popover: 20 10% 18%;
-    --popover-foreground: 30 50% 90%;
+    /* Light Mode - White Background with Glow Orange Accents */
+    --background: 0 0% 100%; /* White */
+    --foreground: 20 10% 10%; /* Very dark gray/black for text on white */
+    --card: 0 0% 98%; /* Slightly off-white card */
+    --card-foreground: 20 10% 10%;
+    --popover: 0 0% 97%; /* Slightly off-white popover */
+    --popover-foreground: 20 10% 10%;
     --primary: 30 100% 55%; /* Bright Orange */
-    --primary-foreground: 20 100% 10%; /* Very dark for contrast on orange */
+    --primary-foreground: 0 0% 100%; /* White text on orange */
     --secondary: 25 90% 45%; /* Slightly darker/muted orange */
-    --secondary-foreground: 20 100% 10%;
-    --muted: 30 30% 30%; /* Muted dark orange/brown */
-    --muted-foreground: 30 30% 70%; /* Lighter muted for text */
+    --secondary-foreground: 0 0% 100%; /* White text on secondary orange */
+    --muted: 0 0% 90%; /* Light gray for muted elements */
+    --muted-foreground: 20 10% 40%; /* Darker gray for muted text */
     --accent: 35 100% 60%; /* Glowing Orange - slightly brighter/different hue */
-    --accent-foreground: 20 100% 10%;
+    --accent-foreground: 0 0% 100%; /* White text on accent orange */
     --destructive: 0 84.2% 60.2%; /* Standard Red */
     --destructive-foreground: 0 0% 98%; /* Almost White */
-    --border: 30 50% 35%; /* Orange-tinted border */
-    --input: 30 50% 25%; /* Dark orange-tinted input bg */
+    --border: 0 0% 85%; /* Light gray border */
+    --input: 0 0% 92%; /* Light gray input background */
     --ring: 35 100% 65%; /* Bright orange ring for focus */
     --chart-1: 30 100% 50%;
     --chart-2: 40 100% 50%;
@@ -37,13 +37,13 @@ body {
     --radius: 0.5rem;
 
     /* Sidebar variables - Light Theme */
-    --sidebar-background: 20 8% 12%; /* Even darker for sidebar */
-    --sidebar-foreground: 30 50% 85%;
+    --sidebar-background: 0 0% 96%; /* Very light gray for sidebar */
+    --sidebar-foreground: 20 10% 20%; /* Dark text for sidebar */
     --sidebar-primary: 30 100% 55%; /* Consistent with main primary */
-    --sidebar-primary-foreground: 20 100% 10%;
+    --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 35 100% 60%; /* Consistent with main accent */
-    --sidebar-accent-foreground: 20 100% 10%;
-    --sidebar-border: 30 50% 25%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 80%;
     --sidebar-ring: 35 100% 65%;
   }
 
