@@ -140,7 +140,7 @@ export default function TeleCheckPage() {
     setIsClient(true);
   }, []);
   
-  const isAdmin = isClient && currentUserEmail === ADMIN_EMAIL && currentUserStatus === "approved";
+  const isAdmin = isClient && currentUserEmail?.toLowerCase() === ADMIN_EMAIL.toLowerCase() && currentUserStatus === "approved";
 
   const saveAccessRequests = useCallback((updatedRequests: AccessRequest[]) => {
     if (!isClient) return;
@@ -150,7 +150,7 @@ export default function TeleCheckPage() {
 
   const updateCurrentUserLastSeen = useCallback((requests: AccessRequest[], email: string | null) => {
     if (!isClient || !email) return requests;
-    const userIndex = requests.findIndex(req => req.email === email);
+    const userIndex = requests.findIndex(req => req.email.toLowerCase() === email.toLowerCase());
     if (userIndex > -1 && requests[userIndex].status === "approved") {
       const updatedRequests = [...requests];
       updatedRequests[userIndex] = { ...updatedRequests[userIndex], lastSeen: new Date().toISOString() };
@@ -179,7 +179,7 @@ export default function TeleCheckPage() {
       }
     }
     
-    let adminRecord = loadedRequests.find(req => req.email === ADMIN_EMAIL);
+    let adminRecord = loadedRequests.find(req => req.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
     if (adminRecord) {
         if (adminRecord.status !== "approved") {
             adminRecord.status = "approved"; 
@@ -192,7 +192,7 @@ export default function TeleCheckPage() {
     let finalRequests = [...loadedRequests];
 
     if (storedEmail) {
-      const userRequest = finalRequests.find(req => req.email === storedEmail);
+      const userRequest = finalRequests.find(req => req.email.toLowerCase() === storedEmail.toLowerCase());
       if (userRequest) {
         setCurrentUserStatus(userRequest.status);
         if (userRequest.status === "approved") {
@@ -287,11 +287,11 @@ export default function TeleCheckPage() {
 
     let toastTitle = "";
     let toastMessage = "";
-    const originalRequest = accessRequests.find(r => r.email === targetEmail);
+    const originalRequest = accessRequests.find(r => r.email.toLowerCase() === targetEmail.toLowerCase());
     const originalStatus = originalRequest?.status;
 
     let updatedRequests = accessRequests.map(req =>
-      req.email === targetEmail ? { ...req, status: newStatus, requestedAt: new Date().toISOString() } : req
+      req.email.toLowerCase() === targetEmail.toLowerCase() ? { ...req, status: newStatus, requestedAt: new Date().toISOString() } : req
     );
     
     if (targetEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase() && newStatus === "revoked") {
@@ -312,7 +312,7 @@ export default function TeleCheckPage() {
     }
 
     if (newStatus === "approved") {
-        const userIndex = updatedRequests.findIndex(req => req.email === targetEmail);
+        const userIndex = updatedRequests.findIndex(req => req.email.toLowerCase() === targetEmail.toLowerCase());
         if (userIndex > -1) {
             updatedRequests[userIndex].lastSeen = new Date().toISOString();
         }
@@ -338,7 +338,7 @@ export default function TeleCheckPage() {
 
     saveAccessRequests(updatedRequests);
 
-    if (targetEmail === currentUserEmail) {
+    if (targetEmail.toLowerCase() === currentUserEmail?.toLowerCase()) {
       setCurrentUserStatus(newStatus);
     }
     
@@ -480,39 +480,38 @@ export default function TeleCheckPage() {
   };
   
   const renderHeaderContent = () => {
-    let icon = <ListChecks className="h-10 w-10 sm:h-12 sm:w-12 text-primary animate-pulse" />;
-    let title = "TeleCheck Bot";
-    let subtitle = "Bulk check Telegram account status quickly and easily.";
+    let icon = <Hourglass className="h-10 w-10 sm:h-12 sm:w-12 text-primary animate-spin" />;
+    let title = "Loading Bot...";
+    let subtitle = "Please wait while we check your access status.";
     let adminNote;
-
-    if (!isClient || currentUserStatus === "loading") {
-       icon = <Hourglass className="h-10 w-10 sm:h-12 sm:w-12 text-primary animate-spin" />;
-       title = "Loading Bot...";
-       subtitle = "Please wait while we check your access status.";
-    } else if (currentUserStatus === "approved") {
-        icon = <UserCheck className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />;
-        if (isAdmin) {
-          title = "TeleCheck Bot - Admin";
-          subtitle = "Manage user access and perform bulk checks.";
-          adminNote = <p className="mt-2 text-sm text-green-500 font-medium">Admin access active.</p>;
-        } else {
-          title = "TeleCheck Bot";
-          subtitle = "Access Approved! You can now use the checker.";
-          adminNote = <p className="mt-2 text-sm text-green-500 font-medium">Access Approved. You can use the checker.</p>;
-        }
-    } else if (currentUserStatus === "pending_approval") {
-        icon = <Hourglass className="h-10 w-10 sm:h-12 sm:w-12 text-amber-500 animate-spin" />;
-        title = "Request Pending";
-        subtitle = "Your access to TeleCheck Bot is awaiting admin approval."
-    } else if (currentUserStatus === "revoked") {
-        icon = <ShieldAlert className="h-10 w-10 sm:h-12 sm:w-12 text-destructive" />;
-        title = "Access Revoked";
-        subtitle = "Your access to TeleCheck Bot has been revoked. Please contact the admin.";
-    } else if (currentUserStatus === "needs_approval") {
-        icon = <ShieldAlert className="h-10 w-10 sm:h-12 sm:w-12 text-destructive" />;
-        title = "Access Required";
-        subtitle = "Please request access to use the TeleCheck Bot."
+    
+    if(isClient) { // Only update header content if client is ready
+      if (currentUserStatus === "approved") {
+          icon = <UserCheck className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />;
+          if (isAdmin) {
+            title = "TeleCheck Bot - Admin";
+            subtitle = "Manage user access and perform bulk checks.";
+            adminNote = <p className="mt-2 text-sm text-green-500 font-medium">Admin access active.</p>;
+          } else {
+            title = "TeleCheck Bot";
+            subtitle = "Access Approved! You can now use the checker.";
+            adminNote = <p className="mt-2 text-sm text-green-500 font-medium">Access Approved. You can use the checker.</p>;
+          }
+      } else if (currentUserStatus === "pending_approval") {
+          icon = <Hourglass className="h-10 w-10 sm:h-12 sm:w-12 text-amber-500 animate-spin" />;
+          title = "Request Pending";
+          subtitle = "Your access to TeleCheck Bot is awaiting admin approval."
+      } else if (currentUserStatus === "revoked") {
+          icon = <ShieldAlert className="h-10 w-10 sm:h-12 sm:w-12 text-destructive" />;
+          title = "Access Revoked";
+          subtitle = "Your access to TeleCheck Bot has been revoked. Please contact the admin.";
+      } else if (currentUserStatus === "needs_approval") {
+          icon = <ShieldAlert className="h-10 w-10 sm:h-12 sm:w-12 text-destructive" />;
+          title = "Access Required";
+          subtitle = "Please request access to use the TeleCheck Bot."
+      }
     }
+
 
     return (
       <div className="text-center">
@@ -543,15 +542,15 @@ export default function TeleCheckPage() {
         <CardHeader>
           <CardTitle className="flex items-center text-2xl font-headline">
             <UserCog className="mr-3 h-8 w-8 text-primary" />
-            Admin Panel - User Access Management
+            Admin Panel - User Management
           </CardTitle>
           <CardDescription>
-            Review and manage user access requests for the TeleCheck Bot.
+            Approve, deny, or revoke user access. Monitor user activity via 'Last Seen'. Pending requests are listed for review.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {sortedRequests.length === 0 || (sortedRequests.length === 1 && sortedRequests[0].email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && sortedRequests[0].status === 'approved') ? (
-            <p className="text-muted-foreground text-center py-6">No other user access requests at the moment.</p>
+            <p className="text-muted-foreground text-center py-6">No other user access requests or user data at the moment.</p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -648,10 +647,10 @@ export default function TeleCheckPage() {
   };
 
   const renderDownloadSection = () => {
-    if (!isClient) return null; 
+    if (!isClient || currentUserStatus !== "approved") return null; 
 
     const downloadableResultsExist = results.some(r => r.phoneNumber && (r.status === 'found' || r.status === 'not_found' || r.status === 'error'));
-    if (!downloadableResultsExist || currentUserStatus !== "approved") {
+    if (!downloadableResultsExist) {
       return null;
     }
 
@@ -711,6 +710,7 @@ export default function TeleCheckPage() {
     }
     
     if (currentUserStatus === "pending_approval" && currentUserEmail?.toLowerCase() === ADMIN_EMAIL.toLowerCase() && !isAdmin) {
+        // This case is for an admin who somehow got into pending state. Show request form to re-trigger admin approval.
         return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
     }
 
@@ -742,6 +742,7 @@ export default function TeleCheckPage() {
       );
     }
     
+    // Fallback, should ideally be covered by above conditions
     return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
   };
 
@@ -781,6 +782,7 @@ export default function TeleCheckPage() {
               (Dev: Full Reset)
             </Button>
              <Button variant="link" size="sm" className="text-xs" onClick={() => {
+                if (!isClient) return;
                 let updatedRequests = [...accessRequests];
                 const adminIndex = updatedRequests.findIndex(req => req.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
                 if (adminIndex > -1) {
@@ -793,12 +795,14 @@ export default function TeleCheckPage() {
                 if (currentUserEmail?.toLowerCase() !== ADMIN_EMAIL.toLowerCase() || currentUserStatus !== "approved") {
                     setCurrentUserEmail(ADMIN_EMAIL);
                     setCurrentUserStatus("approved");
+                     localStorage.setItem("telecheck_currentUserEmail", ADMIN_EMAIL);
                 }
-                 toast({title: "Dev: Ensure Admin Approved", description: `${ADMIN_EMAIL} set to approved.`, variant: "default"})
+                 toast({title: "Dev: Ensure Admin Approved", description: `${ADMIN_EMAIL} set to approved. Current user set to admin.`, variant: "default"})
             }}>
-              (Dev: Ensure Admin Approved)
+              (Dev: Ensure Admin Approved & Set)
             </Button>
              <Button variant="link" size="sm" className="text-xs" onClick={() => {
+              if(!isClient) return;
               if(currentUserEmail && currentUserEmail.toLowerCase() !== ADMIN_EMAIL.toLowerCase()){
                 handleAdminAction(currentUserEmail, "approved");
                  toast({title: "Dev: Current User Approved", description: `${currentUserEmail} approved. Refresh if UI doesn't update.`, variant: "default"})
