@@ -9,7 +9,7 @@ import { ResultDisplay, type ResultState } from "@/components/telecheck/result-d
 import { RequestAccessForm } from "@/components/telecheck/request-access-form";
 import { PendingApprovalMessage } from "@/components/telecheck/pending-approval-message";
 import { useToast } from "@/hooks/use-toast";
-import { ListChecks, ShieldAlert, UserCheck, Users, ShieldCheck, UserCog, Download, FileSpreadsheet, MessageSquare, Phone, Send, ClipboardCopy } from "lucide-react";
+import { ListChecks, ShieldAlert, UserCheck, Users, ShieldCheck, UserCog, Download, FileSpreadsheet, MessageSquare, Phone, Send, ClipboardCopy, Hourglass } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -226,12 +226,10 @@ export default function TeleCheckPage() {
     let updatedRequests = [...accessRequests]; 
     const existingRequestIndex = updatedRequests.findIndex(req => req.email === data.email);
     let newStatusForCurrentUser: UserStatus = "pending_approval";
-    let newLastSeenForCurrentUser: string | undefined = undefined;
 
 
     if (data.email === ADMIN_EMAIL) {
       newStatusForCurrentUser = "approved"; 
-      newLastSeenForCurrentUser = now;
       if (existingRequestIndex > -1) {
         updatedRequests[existingRequestIndex] = { ...updatedRequests[existingRequestIndex], status: "approved", requestedAt: now, lastSeen: now };
       } else {
@@ -254,7 +252,6 @@ export default function TeleCheckPage() {
           });
         } else if (existingRequest.status === 'approved') {
           newStatusForCurrentUser = "approved";
-          newLastSeenForCurrentUser = now; 
           updatedRequests[existingRequestIndex] = { ...existingRequest, lastSeen: now };
           toast({
             title: "Already Approved",
@@ -313,6 +310,7 @@ export default function TeleCheckPage() {
             }
         }
     }
+
     if (newStatus === "approved") {
         const userIndex = updatedRequests.findIndex(req => req.email === targetEmail);
         if (userIndex > -1) {
@@ -328,11 +326,11 @@ export default function TeleCheckPage() {
         if (originalStatus === 'pending_approval') {
             toastTitle = "Request Rejected";
             toastMessage = `Access request from ${targetEmail} has been rejected.`;
-        } else { // Was 'approved' or already 'revoked' (though UI should prevent revoking already revoked)
+        } else { 
             toastTitle = "Access Revoked";
             toastMessage = `Access for ${targetEmail} has been revoked.`;
         }
-    } else if (newStatus === "pending_approval") { // This is for "Re-evaluate"
+    } else if (newStatus === "pending_approval") { 
         toastTitle = "User Re-evaluation";
         toastMessage = `${targetEmail} is now pending re-evaluation by the admin.`;
     }
@@ -488,18 +486,22 @@ export default function TeleCheckPage() {
     let adminNote;
 
     if (!isClient || currentUserStatus === "loading") {
-      // Keep default loading icon
+       icon = <Hourglass className="h-10 w-10 sm:h-12 sm:w-12 text-primary animate-spin" />;
+       title = "Loading Bot...";
+       subtitle = "Please wait while we check your access status.";
     } else if (currentUserStatus === "approved") {
-        icon = <UserCheck className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />; // Use green-500 or a theme variable if defined
+        icon = <UserCheck className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />;
         if (isAdmin) {
           title = "TeleCheck Bot - Admin";
           subtitle = "Manage user access and perform bulk checks.";
-          adminNote = <p className="mt-2 text-sm text-green-500">Admin access active.</p>;
+          adminNote = <p className="mt-2 text-sm text-green-500 font-medium">Admin access active.</p>;
         } else {
-          adminNote = <p className="mt-2 text-sm text-green-500">Access Approved. You can use the checker.</p>;
+          title = "TeleCheck Bot";
+          subtitle = "Access Approved! You can now use the checker.";
+          adminNote = <p className="mt-2 text-sm text-green-500 font-medium">Access Approved. You can use the checker.</p>;
         }
     } else if (currentUserStatus === "pending_approval") {
-        icon = <ListChecks className="h-10 w-10 sm:h-12 sm:w-12 text-amber-500" />; // Use amber-500 or a theme variable
+        icon = <Hourglass className="h-10 w-10 sm:h-12 sm:w-12 text-amber-500 animate-spin" />;
         title = "Request Pending";
         subtitle = "Your access to TeleCheck Bot is awaiting admin approval."
     } else if (currentUserStatus === "revoked") {
@@ -514,11 +516,11 @@ export default function TeleCheckPage() {
 
     return (
       <div className="text-center">
-        <div className="flex items-center justify-center mb-3">
+        <div className="flex items-center justify-center mb-4">
           {icon}
         </div>
         <h1 className="text-4xl sm:text-5xl font-bold font-headline text-primary">{title}</h1>
-        <p className="mt-1 text-md sm:text-lg text-muted-foreground">{subtitle}</p>
+        <p className="mt-2 text-md sm:text-lg text-muted-foreground">{subtitle}</p>
         {adminNote}
       </div>
     );
@@ -537,34 +539,34 @@ export default function TeleCheckPage() {
     });
 
     return (
-      <Card className="w-full max-w-5xl mt-8 shadow-xl">
+      <Card className="w-full max-w-5xl mt-10 mb-8 shadow-xl">
         <CardHeader>
           <CardTitle className="flex items-center text-2xl font-headline">
-            <UserCog className="mr-2 h-8 w-8 text-primary" />
-            Admin Panel - User Access Requests
+            <UserCog className="mr-3 h-8 w-8 text-primary" />
+            Admin Panel - User Access Management
           </CardTitle>
           <CardDescription>
-            Manage user access to the TeleCheck Bot. Approved users can use the bulk checker.
+            Review and manage user access requests for the TeleCheck Bot.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {sortedRequests.length === 0 || (sortedRequests.length === 1 && sortedRequests[0].email === ADMIN_EMAIL && sortedRequests[0].status === 'approved') ? (
-            <p className="text-muted-foreground text-center py-4">No other user access requests yet.</p>
+            <p className="text-muted-foreground text-center py-6">No other user access requests at the moment.</p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[200px] sm:min-w-[250px]">Email</TableHead>
-                    <TableHead className="min-w-[180px] sm:min-w-[200px]">Requested At</TableHead>
-                    <TableHead className="min-w-[150px] sm:min-w-[180px]">Last Seen</TableHead>
-                    <TableHead className="min-w-[120px]">Status</TableHead>
-                    <TableHead className="text-right min-w-[220px] sm:min-w-[280px]">Actions</TableHead>
+                    <TableHead className="min-w-[200px] sm:min-w-[250px] font-semibold">Email</TableHead>
+                    <TableHead className="min-w-[180px] sm:min-w-[200px] font-semibold">Requested At</TableHead>
+                    <TableHead className="min-w-[150px] sm:min-w-[180px] font-semibold">Last Seen</TableHead>
+                    <TableHead className="min-w-[120px] font-semibold">Status</TableHead>
+                    <TableHead className="text-right min-w-[220px] sm:min-w-[280px] font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedRequests.map((req) => (
-                    <TableRow key={req.email}>
+                    <TableRow key={req.email} className="hover:bg-muted/30">
                       <TableCell className="font-medium break-all">{req.email}{req.email === ADMIN_EMAIL && " (Admin)"}</TableCell>
                       <TableCell>{new Date(req.requestedAt).toLocaleString()}</TableCell>
                       <TableCell>
@@ -579,7 +581,7 @@ export default function TeleCheckPage() {
                           req.status === "approved" ? "success" : 
                           req.status === "pending_approval" ? "warning" : 
                           req.status === "revoked" ? "destructive" : "outline"
-                        }>
+                        } className="text-xs">
                           {req.status.replace("_", " ")}
                         </Badge>
                       </TableCell>
@@ -588,7 +590,6 @@ export default function TeleCheckPage() {
                           <>
                             <Button 
                               size="sm" 
-                              variant="outline"
                               className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 text-xs sm:px-3 sm:py-1.5 sm:text-sm"
                               onClick={() => handleAdminAction(req.email, "approved")}
                             >
@@ -695,7 +696,7 @@ export default function TeleCheckPage() {
     if (!isClient || currentUserStatus === "loading") {
       return (
         <div className="flex flex-col items-center justify-center mt-10">
-          <ListChecks className="h-12 w-12 text-primary animate-spin mb-4" />
+          <Hourglass className="h-12 w-12 text-primary animate-spin mb-4" />
           <p className="text-xl text-muted-foreground">Loading status...</p>
         </div>
       );
@@ -818,4 +819,3 @@ export default function TeleCheckPage() {
     </div>
   );
 }
-
