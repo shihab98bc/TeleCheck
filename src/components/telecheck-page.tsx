@@ -2,12 +2,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import * as XLSX from 'xlsx';
 import { PhoneInputForm } from "@/components/telecheck/phone-input-form";
 import { ResultDisplay, type ResultState } from "@/components/telecheck/result-display";
 import { RequestAccessForm } from "@/components/telecheck/request-access-form";
 import { PendingApprovalMessage } from "@/components/telecheck/pending-approval-message";
 import { useToast } from "@/hooks/use-toast";
-import { ListChecks, ShieldAlert, UserCheck, Users, ShieldCheck, ServerCrash, UserCog } from "lucide-react";
+import { ListChecks, ShieldAlert, UserCheck, Users, ShieldCheck, ServerCrash, UserCog, Download, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -19,6 +20,8 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 
 const MAX_NUMBERS_BULK_CHECK = 500;
@@ -32,6 +35,12 @@ type AccessRequest = {
   status: UserStatus;
 };
 
+type DownloadFilters = {
+  found: boolean;
+  not_found: boolean;
+  error: boolean;
+};
+
 export default function TeleCheckPage() {
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [currentUserStatus, setCurrentUserStatus] = useState<UserStatus>("loading");
@@ -40,6 +49,12 @@ export default function TeleCheckPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<ResultState[]>([]);
   const { toast } = useToast();
+
+  const [downloadFilters, setDownloadFilters] = useState<DownloadFilters>({
+    found: true,
+    not_found: true,
+    error: true,
+  });
 
   const saveAccessRequests = useCallback((updatedRequests: AccessRequest[]) => {
     setAccessRequests(updatedRequests);
@@ -56,32 +71,26 @@ export default function TeleCheckPage() {
       requests = JSON.parse(storedRequests);
     }
     
-    // Ensure admin always has an approved record if they are the current user
-    // or if no requests exist yet and admin is interacting
     if (storedEmail === ADMIN_EMAIL) {
         let adminRecord = requests.find(req => req.email === ADMIN_EMAIL);
         if (adminRecord) {
             if (adminRecord.status !== "approved") {
-                adminRecord.status = "approved"; // Ensure admin is always approved
+                adminRecord.status = "approved"; 
                 adminRecord.requestedAt = new Date().toISOString();
             }
         } else {
             requests.push({ email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved" });
         }
-    } else if (requests.length === 0 && storedEmail === null && ADMIN_EMAIL) { 
-        // Scenario: No stored user, no requests, perhaps admin is first-time "visiting"
-        // This case is less likely now with auto-approval on request, but good for robustness
     }
 
 
-    setAccessRequests(requests); // Set requests before deriving current user status
+    setAccessRequests(requests); 
 
     if (storedEmail) {
       const userRequest = requests.find(req => req.email === storedEmail);
       if (userRequest) {
         setCurrentUserStatus(userRequest.status);
       } else {
-         // If it's the admin and their record was just created above, reflect approved status
         if (storedEmail === ADMIN_EMAIL) {
             setCurrentUserStatus("approved");
         } else {
@@ -91,7 +100,7 @@ export default function TeleCheckPage() {
     } else {
       setCurrentUserStatus("needs_approval");
     }
-  }, [saveAccessRequests]); // Removed ADMIN_EMAIL from dependency array as it's a constant
+  }, [saveAccessRequests]);
 
 
   const handleRequestAccessSubmit = (data: { email: string }) => {
@@ -103,7 +112,7 @@ export default function TeleCheckPage() {
     let newStatusForCurrentUser: UserStatus = "pending_approval";
 
     if (data.email === ADMIN_EMAIL) {
-      newStatusForCurrentUser = "approved"; // Auto-approve admin
+      newStatusForCurrentUser = "approved"; 
       if (existingRequestIndex > -1) {
         updatedRequests[existingRequestIndex] = { ...updatedRequests[existingRequestIndex], status: "approved", requestedAt: now };
       } else {
@@ -115,7 +124,6 @@ export default function TeleCheckPage() {
         variant: "default",
       });
     } else {
-      // Handle non-admin user requests
       if (existingRequestIndex > -1) {
         const existingRequest = updatedRequests[existingRequestIndex];
         if (existingRequest.status === 'revoked' || existingRequest.status === 'pending_approval') {
@@ -132,7 +140,7 @@ export default function TeleCheckPage() {
             description: `Access for ${data.email} is already approved.`,
             variant: "default",
           });
-        } else { // e.g. needs_approval, should not happen if existing
+        } else { 
           newStatusForCurrentUser = existingRequest.status; 
            toast({
             title: "Request Status",
@@ -140,7 +148,6 @@ export default function TeleCheckPage() {
           });
         }
       } else {
-        // New non-admin request
         updatedRequests.push({ email: data.email, requestedAt: now, status: "pending_approval" });
         newStatusForCurrentUser = "pending_approval";
         toast({
@@ -161,28 +168,15 @@ export default function TeleCheckPage() {
     let updatedRequests = accessRequests.map(req =>
       req.email === targetEmail ? { ...req, status: newStatus, requestedAt: new Date().toISOString() } : req
     );
-     // If admin revokes their own access (for testing), ensure they can still re-approve
-    if (targetEmail === ADMIN_EMAIL && newStatus !== "approved") {
-       // This scenario is typically handled by dev buttons, but as a safeguard:
-       // Admin should not be able to revoke their own access to a point where they cannot log back in
-       // The main check ensures admin is always "approved" if they are the current user.
-       // However, if we explicitly allow revoking admin for dev testing:
-       // updatedRequests = updatedRequests.map(req => 
-       //  req.email === ADMIN_EMAIL ? { ...req, status: newStatus } : req);
-    }
-
-
+    
     saveAccessRequests(updatedRequests);
 
-    // If admin changes status of current non-admin user viewing the page
     if (targetEmail === currentUserEmail && currentUserEmail !== ADMIN_EMAIL) {
       setCurrentUserStatus(newStatus);
     }
-    // If admin changes their own status AND they are the current user
     if (targetEmail === currentUserEmail && targetEmail === ADMIN_EMAIL) {
-        setCurrentUserStatus(newStatus); // Reflect admin's own status change immediately
+        setCurrentUserStatus(newStatus); 
     }
-
 
     toast({
       title: `User Access ${newStatus === "approved" ? "Approved" : newStatus === "revoked" ? "Revoked" : "Updated"}`,
@@ -222,7 +216,7 @@ export default function TeleCheckPage() {
     let processedCount = 0;
 
     for (const phoneNumber of numbersToProcess) {
-      await new Promise(resolve => setTimeout(resolve, 250)); 
+      await new Promise(resolve => setTimeout(resolve, 100)); // Reduced delay for faster bulk processing
 
       let singleResult: ResultState;
       const isValidPhoneNumber = /^\+?[1-9]\d{1,14}$/.test(phoneNumber);
@@ -257,8 +251,12 @@ export default function TeleCheckPage() {
       }
       currentResults.push(singleResult);
       processedCount++;
-      const processingMessage: ResultState = { status: "processing", message: `Checked ${processedCount}/${numbersToProcess.length} numbers...` };
-      setResults([processingMessage, ...currentResults.slice().reverse()]);
+      if (numbersToProcess.length > 1) { // Only show incremental progress for bulk
+        const processingMessage: ResultState = { status: "processing", message: `Checked ${processedCount}/${numbersToProcess.length} numbers...` };
+        setResults([processingMessage, ...currentResults.slice().reverse()]);
+      } else {
+        setResults([...currentResults.slice().reverse()]); // For single number, just show its result
+      }
     }
     
     setResults(currentResults.slice().reverse());
@@ -275,6 +273,49 @@ export default function TeleCheckPage() {
     });
 
     setIsLoading(false);
+  };
+
+  const handleFilterChange = (filterName: keyof DownloadFilters) => {
+    setDownloadFilters(prev => ({ ...prev, [filterName]: !prev[filterName] }));
+  };
+
+  const handleDownloadResults = () => {
+    const downloadable = results.filter(
+      r => r.phoneNumber && (r.status === 'found' || r.status === 'not_found' || r.status === 'error')
+    );
+
+    const filteredForDownload = downloadable.filter(result => {
+      if (downloadFilters.found && result.status === 'found') return true;
+      if (downloadFilters.not_found && result.status === 'not_found') return true;
+      if (downloadFilters.error && result.status === 'error') return true;
+      return false;
+    });
+
+    if (filteredForDownload.length === 0) {
+      toast({
+        title: "No Results to Download",
+        description: "No results match your selected filters, or there are no relevant results to download.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const dataForSheet = filteredForDownload.map(res => ({
+      'Phone Number': res.phoneNumber,
+      'Status': res.status ? res.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'N/A',
+      'Message': res.message,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "TeleCheck Results");
+    XLSX.writeFile(workbook, `telecheck_results_${new Date().toISOString().split('T')[0]}.xlsx`);
+    
+    toast({
+        title: "Download Started",
+        description: `${filteredForDownload.length} records are being downloaded.`,
+        variant: "default",
+      });
   };
   
   const renderHeader = () => {
@@ -387,7 +428,7 @@ export default function TeleCheckPage() {
                         <Button 
                           size="sm" 
                           variant="destructive"
-                          onClick={() => handleAdminAction(req.email, "revoked")} // Rejecting also sets to revoked
+                          onClick={() => handleAdminAction(req.email, "revoked")} 
                         >
                           Reject
                         </Button>
@@ -404,7 +445,7 @@ export default function TeleCheckPage() {
                        {req.email === ADMIN_EMAIL && req.status !== "approved" && (
                          <Button 
                           size="sm" 
-                          variant="default" // Admin can always re-approve themselves
+                          variant="default" 
                           onClick={() => handleAdminAction(req.email, "approved")}
                         >
                           Re-Approve Admin
@@ -416,6 +457,47 @@ export default function TeleCheckPage() {
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderDownloadSection = () => {
+    const downloadableResultsExist = results.some(r => r.phoneNumber && (r.status === 'found' || r.status === 'not_found' || r.status === 'error'));
+    if (!downloadableResultsExist || currentUserStatus !== "approved") {
+      return null;
+    }
+
+    return (
+      <Card className="w-full max-w-md mt-8 shadow-xl">
+        <CardHeader>
+          <CardTitle className="flex items-center text-xl font-headline">
+            <Download className="mr-2 h-6 w-6 text-primary" />
+            Download Results
+          </CardTitle>
+          <CardDescription>
+            Select statuses to include in your XLSX download.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            {(['found', 'not_found', 'error'] as const).map((statusKey) => (
+              <div key={statusKey} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`filter-${statusKey}`}
+                  checked={downloadFilters[statusKey]}
+                  onCheckedChange={() => handleFilterChange(statusKey)}
+                />
+                <Label htmlFor={`filter-${statusKey}`} className="text-sm font-medium capitalize">
+                  {statusKey.replace('_', ' ')}
+                </Label>
+              </div>
+            ))}
+          </div>
+          <Button onClick={handleDownloadResults} className="w-full bg-primary hover:bg-primary/90" disabled={!downloadFilters.found && !downloadFilters.not_found && !downloadFilters.error}>
+            <FileSpreadsheet className="mr-2 h-5 w-5" />
+            Download XLSX
+          </Button>
         </CardContent>
       </Card>
     );
@@ -435,11 +517,10 @@ export default function TeleCheckPage() {
     const isAdmin = currentUserEmail === ADMIN_EMAIL && currentUserStatus === "approved";
 
     if (currentUserStatus === "needs_approval" || currentUserStatus === "revoked") {
-       // If admin's status is revoked (e.g. through dev tools), still show request form
       return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
     }
 
-    if (currentUserStatus === "pending_approval" && currentUserEmail !== ADMIN_EMAIL) { // Admin doesn't see pending for self
+    if (currentUserStatus === "pending_approval" && currentUserEmail !== ADMIN_EMAIL) { 
       return <PendingApprovalMessage userEmail={currentUserEmail || undefined} adminEmail={ADMIN_EMAIL} />;
     }
 
@@ -465,11 +546,11 @@ export default function TeleCheckPage() {
            )}
           <PhoneInputForm onSubmit={handlePhoneNumberSubmit} isLoading={isLoading} />
           <ResultDisplay results={results} />
+          {renderDownloadSection()}
         </>
       );
     }
-    // Fallback for unexpected status, or if needs_approval wasn't caught (e.g. admin pending)
-    // If admin is current user and status is pending (should be auto-approved, but as fallback)
+    
     if (currentUserEmail === ADMIN_EMAIL && currentUserStatus === "pending_approval") {
         return <RequestAccessForm onSubmit={handleRequestAccessSubmit} isLoading={isLoading} />;
     }
@@ -497,7 +578,7 @@ export default function TeleCheckPage() {
               localStorage.removeItem("telecheck_currentUserEmail");
               setCurrentUserEmail(null);
               setAccessRequests([]);
-              setCurrentUserStatus("needs_approval"); // Go back to initial state
+              setCurrentUserStatus("needs_approval"); 
               setResults([]);
               toast({title: "Dev: Full Reset", description: "All access requests and current user email cleared.", variant: "default"})
             }}>
@@ -505,11 +586,9 @@ export default function TeleCheckPage() {
             </Button>
              <Button variant="link" size="sm" className="text-xs" onClick={() => {
                 handleAdminAction(ADMIN_EMAIL, "approved");
-                // Also ensure current user is admin and status is approved
                 if (currentUserEmail !== ADMIN_EMAIL || currentUserStatus !== "approved") {
                     setCurrentUserEmail(ADMIN_EMAIL);
                     setCurrentUserStatus("approved");
-                     // Ensure admin record exists and is approved
                     let adminRecord = accessRequests.find(req => req.email === ADMIN_EMAIL);
                     if (adminRecord) {
                         if (adminRecord.status !== "approved") {
@@ -519,7 +598,7 @@ export default function TeleCheckPage() {
                         saveAccessRequests([...accessRequests, {email: ADMIN_EMAIL, requestedAt: new Date().toISOString(), status: "approved"}]);
                     }
                 }
-                 toast({title: "Dev: Admin Re-Approved", description: `${ADMIN_EMAIL} set to approved.`, variant: "default"})
+                 toast({title: "Dev: Ensure Admin Approved", description: `${ADMIN_EMAIL} set to approved.`, variant: "default"})
             }}>
               (Dev: Ensure Admin Approved)
             </Button>
